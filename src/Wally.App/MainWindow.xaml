@@ -20,7 +20,7 @@
             <DockPanel>
                 <!-- Brand -->
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,18,0,18">
-                    <local:LogoMark Width="24" Height="24" VerticalAlignment="Center" />
+                    <local:LogoMark Width="28" Height="28" VerticalAlignment="Center" />
                     <TextBlock Text="wally" FontSize="18" FontWeight="SemiBold"
                                Foreground="{StaticResource TextPrimary}"
                                VerticalAlignment="Center" Margin="10,0,0,0" />
