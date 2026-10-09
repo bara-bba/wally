@@ -3,6 +3,9 @@ bin/
 obj/
 *.user
 
+# Distribution output
+dist/
+
 # Rider / VS
 .idea/
 .vs/

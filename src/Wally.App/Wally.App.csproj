@@ -11,6 +11,22 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyName>Wally</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Distribution: self-contained single-file exe. Users need nothing
+       preinstalled (the .NET 8 runtime is bundled). Produced via build-dist.ps1
+       or: dotnet publish -c Release. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <Version>0.1.0</Version>
+    <Company>Wally</Company>
+    <Product>Wally</Product>
   </PropertyGroup>
 
 </Project>

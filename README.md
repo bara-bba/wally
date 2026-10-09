@@ -72,3 +72,31 @@ dotnet test  Wally.sln
 ```powershell
 dotnet run --project src/Wally.App
 ```
+
+## Distribution
+
+Wally ships as a **self-contained single-file executable** — one `Wally.exe`
+with the .NET 8 runtime bundled in, so the target machine needs nothing
+preinstalled.
+
+```powershell
+.\build\build-dist.ps1              # win-x64 (default)
+.\build\build-dist.ps1 -Runtime win-arm64
+```
+
+Output: `dist\Wally.exe` (~68 MB; the size is the embedded runtime). The script
+locates the SDK on PATH or falls back to `%USERPROFILE%\.dotnet`, verifying it
+actually has an SDK rather than trusting a bare `dotnet` shim.
+
+Equivalent raw command:
+
+```powershell
+dotnet publish src/Wally.App -c Release -r win-x64
+```
+
+**Requirement for users:** Windows 11 build 26100 (24H2) for the
+virtual-desktop features. The multi-monitor features work on any Windows 11 x64.
+
+**Planned for the real release:** an MSIX package for Start-menu integration,
+clean uninstall, auto-start-on-login, and update support. The single-file exe is
+the interim distribution for testing and sharing.
