@@ -1,0 +1,32 @@
+<UserControl x:Class="Wally.App.LogoMark"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="24" Height="24">
+    <!-- Minimal viewfinder mark: four corner brackets framing a centred square.
+         Drawn on a 24x24 canvas; scales crisply via the parent's Width/Height. -->
+    <Viewbox Stretch="Uniform">
+        <Canvas Width="24" Height="24">
+            <!-- Corner brackets -->
+            <Path Stroke="{DynamicResource Accent}" StrokeThickness="2"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                  StrokeLineJoin="Round"
+                  Data="M3,8 L3,4 L8,4" />
+            <Path Stroke="{DynamicResource Accent}" StrokeThickness="2"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                  StrokeLineJoin="Round"
+                  Data="M16,4 L21,4 L21,8" />
+            <Path Stroke="{DynamicResource Accent}" StrokeThickness="2"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                  StrokeLineJoin="Round"
+                  Data="M21,16 L21,21 L16,21" />
+            <Path Stroke="{DynamicResource Accent}" StrokeThickness="2"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                  StrokeLineJoin="Round"
+                  Data="M8,21 L3,21 L3,16" />
+            <!-- Centred square -->
+            <Rectangle Canvas.Left="9" Canvas.Top="9" Width="6" Height="6"
+                       RadiusX="1.5" RadiusY="1.5"
+                       Fill="{DynamicResource Accent}" />
+        </Canvas>
+    </Viewbox>
+</UserControl>
