@@ -5,6 +5,20 @@ using Microsoft.Win32;
 using Wally.Core;
 using Wally.Platform;
 using Monitor = Wally.Core.Monitor;
+// WinForms is enabled project-wide (for the tray NotifyIcon), so disambiguate
+// the names this WPF view uses toward their WPF types.
+using Color = System.Windows.Media.Color;
+using Brush = System.Windows.Media.Brush;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
+using Button = System.Windows.Controls.Button;
+using Orientation = System.Windows.Controls.Orientation;
+using Grid = System.Windows.Controls.Grid;
+using Border = System.Windows.Controls.Border;
+using TextBlock = System.Windows.Controls.TextBlock;
+using StackPanel = System.Windows.Controls.StackPanel;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using VerticalAlignment = System.Windows.VerticalAlignment;
 
 namespace Wally.App;
 
