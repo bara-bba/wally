@@ -1,74 +1,74 @@
 # Wally
 
-A Wallpaper-Engine-style wallpaper manager for Windows, focused on two things
-Wallpaper Engine does poorly:
+A Wallpaper-Engine-style wallpaper manager for Windows 11, focused on two things
+Wallpaper Engine handles poorly or not at all:
 
-1. **Multi-monitor management** — detects connected displays, remembers rules
-   per *monitor setup* (identified by the set of connected monitors), and
-   reapplies the correct wallpaper to each screen automatically when the setup
-   changes (dock/undock, plug/unplug).
-2. **Per-virtual-desktop wallpapers** — a distinct wallpaper per Windows virtual
-   desktop (Win+Ctrl+D desktops), switching automatically as you move between
-   them. When a new desktop is created, Wally's manager opens so you can assign
-   its wallpaper (with an auto-assign fallback).
+1. **Multi-monitor management** — detects connected displays and remembers
+   per-setup rules, so the right wallpapers reapply automatically when you
+   dock/undock or plug in a monitor.
+2. **Per-virtual-desktop wallpapers** — a different wallpaper on each Windows
+   virtual desktop (Win+Tab → New Desktop), switching automatically as you move
+   between them.
+
+v1 scope is **static images**. Live/video wallpaper is a later layer.
+
+## Stack
+
+- **C# / .NET 8**, WPF for the manager UI + system tray.
+- Target: **Windows 11, build 26100 (24H2)**. The virtual-desktop COM interfaces
+  are undocumented and build-specific, so they are pinned to this build family
+  and isolated behind an adapter.
+
+## Project layout
+
+```
+Wally.sln
+├── src/
+│   ├── Wally.Core/        Pure domain logic — no Windows calls, fully testable
+│   │   ├── Models.cs          Immutable records: Monitor, MonitorSetup, rules, config
+│   │   ├── RulesEngine.cs     Resolve detected state + config → concrete apply actions
+│   │   ├── ConfigStore.cs     Atomic JSON persistence (temp file + replace)
+│   │   └── Equality.cs        Structural equality for collection-bearing records
+│   ├── Wally.Platform/    Windows integration (COM), referenced only by the app
+│   │   ├── Interfaces.cs                IMonitorProvider / IWallpaperBackend / IVirtualDesktopService
+│   │   └── DesktopWallpaperBackend.cs   IDesktopWallpaper COM — per-monitor wallpaper (documented, stable)
+│   └── Wally.App/         WPF manager window + system tray (in progress)
+└── tests/
+    └── Wally.Core.Tests/  xUnit — 15 tests over the pure core
+```
+
+The risky, undocumented **virtual-desktop** layer lives behind
+`IVirtualDesktopService` so per-build COM differences never leak into the core or
+the UI.
 
 ## Status
 
-v1 scope: **static images** (PNG/JPG/BMP). Live/video wallpapers are explicitly
-deferred — the wallpaper backend is behind an interface so a video provider can
-be added later without touching the rules engine.
+**Done & verified**
+- Core domain, rules engine, JSON store — **15 unit tests passing**.
+- `DesktopWallpaperBackend` (multi-monitor `IDesktopWallpaper`) — **live-tested**:
+  enumerates the real display, derives a stable per-monitor EDID key and setup
+  fingerprint.
 
-Target: **Windows 11 24H2 (build 26100)**. The virtual-desktop COM interfaces
-are undocumented and build-specific; they are isolated in
-`wally/platform/virtual_desktop/` behind `VirtualDesktopService` so a different
-build's GUIDs can be swapped in one place.
+**Unbuilt (critical path)**
+- Virtual-desktop COM service (pinned to build 26100).
+- Background watcher — reacts to monitor plug/unplug and desktop switches.
+- WPF manager UI — assign images per monitor/per setup.
+- System tray + autostart.
 
-## Architecture
+## Prerequisites
 
-```
-wally/
-  core/            Pure logic, no Windows calls — unit-testable
-    models.py        Monitor, MonitorSetup, DesktopAssignment, Rule dataclasses
-    rules.py         Rule matching: setup-fingerprint -> per-monitor wallpaper
-    store.py         JSON persistence of rules & assignments
-  platform/        Windows-specific adapters (COM / Win32)
-    monitors.py      Enumerate monitors via IDesktopWallpaper + EnumDisplayMonitors
-    wallpaper.py     Set per-monitor wallpaper via IDesktopWallpaper (documented)
-    virtual_desktop/ Undocumented VD COM, pinned to 24H2, behind an interface
-  app/             UI + background service
-    tray.py          System-tray background watcher
-    manager.py       PySide6 manager window
-  __main__.py      Entry point
-tests/             pytest unit tests for core/ (no Windows needed)
-```
+The .NET 8 SDK. If `dotnet` is not on your PATH it may still be installed under
+`%USERPROFILE%\.dotnet` — invoke it from there, or add it to PATH.
 
-### Design principles
-- `core/` is pure Python with zero Windows imports, so the rules engine is
-  fully unit-testable on any machine (CI-friendly).
-- Every Windows adapter sits behind a small protocol so `core/` depends on
-  interfaces, not COM.
-- The undocumented virtual-desktop interface is the only build-fragile code and
-  it lives in exactly one directory with a clear fallback path.
-
-## Requirements
-
-- Windows 11 (tested target: 24H2 / build 26100)
-- Python 3.12+
-- `pip install -r requirements.txt`  (pywin32, comtypes, PySide6, Pillow)
-
-## Running
+## Build & test
 
 ```powershell
-cd wally
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m wally            # launches tray + manager
+dotnet build Wally.sln
+dotnet test  Wally.sln
 ```
 
-## Tests
+## Run (once the app layer lands)
 
 ```powershell
-pip install -r requirements-dev.txt
-pytest            # core/ logic only, no Windows APIs touched
+dotnet run --project src/Wally.App
 ```

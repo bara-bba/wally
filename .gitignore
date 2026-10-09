@@ -1,22 +1,17 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.venv/
-venv/
-env/
+# .NET build output
+bin/
+obj/
+*.user
 
-# Build / packaging
-build/
-dist/
-*.spec.bak
-
-# Wally runtime config (user-local, not source)
-config.json
-
-# OS / editor
-Thumbs.db
-desktop.ini
-.vscode/
+# Rider / VS
 .idea/
+.vs/
+*.suo
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+
+# OS
+Thumbs.db
+.DS_Store
