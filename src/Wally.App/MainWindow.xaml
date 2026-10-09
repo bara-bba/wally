@@ -1,12 +1,59 @@
-﻿<Window x:Class="Wally.App.MainWindow"
+<Window x:Class="Wally.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wally.App"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="wally" Height="640" Width="1000"
+        MinHeight="480" MinWidth="760"
+        Background="{StaticResource AppBackground}"
+        FontFamily="{StaticResource AppFont}">
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
+        <!-- Left navigation rail -->
+        <Border Grid.Column="0" Background="{StaticResource NavBackground}">
+            <DockPanel>
+                <!-- Brand -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,18,0,18">
+                    <Border Width="26" Height="26" CornerRadius="6" Background="{StaticResource Accent}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="w" Foreground="#001018" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="wally" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               VerticalAlignment="Center" Margin="10,0,0,0" />
+                </StackPanel>
+
+                <!-- Nav items -->
+                <StackPanel DockPanel.Dock="Top">
+                    <RadioButton x:Name="NavMonitors" Style="{StaticResource NavButton}"
+                                 Content="Monitors" IsChecked="True"
+                                 Checked="NavMonitors_Checked" GroupName="nav" />
+                    <RadioButton x:Name="NavDesktops" Style="{StaticResource NavButton}"
+                                 Content="Virtual desktops"
+                                 Checked="NavDesktops_Checked" GroupName="nav" />
+                    <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}"
+                                 Content="Settings"
+                                 Checked="NavSettings_Checked" GroupName="nav" />
+                </StackPanel>
+
+                <!-- Footer version -->
+                <TextBlock DockPanel.Dock="Bottom" Text="v0.1.0 · Windows 11 24H2"
+                           Foreground="{StaticResource TextTertiary}" FontSize="11"
+                           Margin="18,0,0,16" VerticalAlignment="Bottom" />
+                <Grid />
+            </DockPanel>
+        </Border>
+
+        <!-- Content host -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="32,28,32,28">
+            <ContentControl x:Name="ContentHost" />
+        </ScrollViewer>
     </Grid>
 </Window>
