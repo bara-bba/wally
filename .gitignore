@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.spec.bak
+
+# Wally runtime config (user-local, not source)
+config.json
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
