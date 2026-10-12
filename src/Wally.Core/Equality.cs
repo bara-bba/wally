@@ -74,6 +74,7 @@ public sealed partial record WallyConfig
     public bool Equals(WallyConfig? other)
         => other is not null
            && NewDesktopBehavior == other.NewDesktopBehavior
+           && GalleryFolder == other.GalleryFolder
            && SeqEquality.ListEquals(SetupRules, other.SetupRules)
            && SeqEquality.ListEquals(DesktopAssignments, other.DesktopAssignments)
            && SeqEquality.ListEquals(RotationPool, other.RotationPool);
@@ -81,6 +82,7 @@ public sealed partial record WallyConfig
     public override int GetHashCode()
         => HashCode.Combine(
             NewDesktopBehavior,
+            GalleryFolder,
             SeqEquality.ListHash(SetupRules),
             SeqEquality.ListHash(DesktopAssignments),
             SeqEquality.ListHash(RotationPool));

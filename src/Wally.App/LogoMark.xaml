@@ -14,30 +14,30 @@
 
             <Canvas Width="28" Height="28">
                 <!-- Monitor screen frame (dark outline on the white tile) -->
-                <Border Canvas.Left="6" Canvas.Top="7" Width="16" Height="11"
+                <Border Canvas.Left="8" Canvas.Top="8" Width="12" Height="8.5"
                         CornerRadius="1.5"
                         Background="{DynamicResource Accent}"
                         BorderBrush="{DynamicResource AppBackground}"
-                        BorderThickness="2">
+                        BorderThickness="1.6">
                     <!-- Wallpaper motif inside the screen, clipped to the frame -->
                     <Grid ClipToBounds="True">
                         <!-- Sun -->
-                        <Ellipse Width="4" Height="4"
+                        <Ellipse Width="2.6" Height="2.6"
                                  Fill="{DynamicResource AppBackground}"
                                  HorizontalAlignment="Left" VerticalAlignment="Top"
-                                 Margin="1.5,0.5,0,0" />
+                                 Margin="1,0.6,0,0" />
                         <!-- Hill / horizon -->
                         <Path Fill="{DynamicResource AppBackground}"
-                              Data="M -2,9 Q 4,3 8,6 Q 11,8 16,4 L 16,11 L -2,11 Z"
+                              Data="M -2,7 Q 3,3 6,5 Q 8,6 12,3 L 12,9 L -2,9 Z"
                               VerticalAlignment="Bottom" />
                     </Grid>
                 </Border>
 
                 <!-- Monitor stand -->
-                <Rectangle Canvas.Left="13" Canvas.Top="18" Width="2" Height="2.5"
+                <Rectangle Canvas.Left="13.2" Canvas.Top="16.5" Width="1.6" Height="2"
                            Fill="{DynamicResource AppBackground}" />
-                <Rectangle Canvas.Left="10" Canvas.Top="20" Width="8" Height="2"
-                           RadiusX="1" RadiusY="1"
+                <Rectangle Canvas.Left="11" Canvas.Top="18" Width="6" Height="1.6"
+                           RadiusX="0.8" RadiusY="0.8"
                            Fill="{DynamicResource AppBackground}" />
             </Canvas>
         </Grid>

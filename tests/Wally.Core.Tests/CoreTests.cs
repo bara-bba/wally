@@ -166,7 +166,11 @@ public class CoreTests
             { NewDesktopBehavior = "auto_assign", RotationPool = new[] { "x.jpg", "y.jpg" } }
             .WithSetupRule(new SetupRule(
                 "fp",
-                new[] { new MonitorRule("A", "a.jpg", WallpaperFit.Fit) },
+                new[]
+                {
+                    new MonitorRule("A", "a.jpg", WallpaperFit.Fit),
+                    new MonitorRule("B", "b.jpg", WallpaperFit.Fill, RotationDegrees: 90),
+                },
                 DefaultImage: "d.jpg"))
             .WithDesktopAssignment(new DesktopAssignment("g1", "g.jpg"));
 

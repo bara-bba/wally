@@ -11,45 +11,66 @@
         FontFamily="{StaticResource AppFont}">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
+            <ColumnDefinition x:Name="NavColumn" Width="60" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <!-- Left navigation rail -->
         <Border Grid.Column="0" Background="{StaticResource NavBackground}">
             <DockPanel>
-                <!-- Brand -->
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,18,0,18">
-                    <local:LogoMark Width="28" Height="28" VerticalAlignment="Center" />
-                    <TextBlock Text="wally" FontSize="18" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}"
-                               VerticalAlignment="Center" Margin="10,0,0,0" />
-                </StackPanel>
+                <!-- Hamburger toggle -->
+                <Button x:Name="NavToggle" DockPanel.Dock="Top"
+                        Width="40" Height="40" Margin="8,12,0,4"
+                        HorizontalAlignment="Left" Cursor="Hand"
+                        Click="NavToggle_Click"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{StaticResource TextSecondary}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="b" CornerRadius="6" Background="Transparent">
+                                <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                           FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="b" Property="Background" Value="{StaticResource CardHover}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
 
-                <!-- Nav items -->
-                <StackPanel DockPanel.Dock="Top">
+                <!-- Nav items (Tag = Segoe Fluent glyph) -->
+                <StackPanel DockPanel.Dock="Top" Margin="0,8,0,0">
                     <RadioButton x:Name="NavMonitors" Style="{StaticResource NavButton}"
-                                 Content="Monitors" IsChecked="True"
+                                 Content="Monitors" Tag="&#xE7F4;" IsChecked="True"
+                                 ToolTip="Monitors"
                                  Checked="NavMonitors_Checked" GroupName="nav" />
                     <RadioButton x:Name="NavDesktops" Style="{StaticResource NavButton}"
-                                 Content="Virtual desktops"
+                                 Content="Virtual desktops" Tag="&#xE7C4;"
+                                 ToolTip="Virtual desktops"
                                  Checked="NavDesktops_Checked" GroupName="nav" />
                     <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}"
-                                 Content="Settings"
+                                 Content="Settings" Tag="&#xE713;"
+                                 ToolTip="Settings"
                                  Checked="NavSettings_Checked" GroupName="nav" />
                 </StackPanel>
 
-                <!-- Footer version -->
+                <!-- Footer version (only when expanded) -->
                 <TextBlock DockPanel.Dock="Bottom" Text="v0.1.0 · Windows 11 24H2"
                            Foreground="{StaticResource TextTertiary}" FontSize="11"
-                           Margin="18,0,0,16" VerticalAlignment="Bottom" />
+                           Margin="18,0,0,16" VerticalAlignment="Bottom"
+                           Visibility="{Binding NavExpanded, RelativeSource={RelativeSource AncestorType=Window},
+                                        Converter={StaticResource BoolToVisibility}}" />
                 <Grid />
             </DockPanel>
         </Border>
 
-        <!-- Content host -->
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="32,28,32,28">
+        <!-- Content host: a bounded (non-scrolling) area. Views that need to
+             scroll manage it internally; a scrolling host here would give the
+             Monitors view infinite height and break its star-row layout. -->
+        <Border Grid.Column="1" Padding="32,24,32,24">
             <ContentControl x:Name="ContentHost" />
-        </ScrollViewer>
+        </Border>
     </Grid>
 </Window>

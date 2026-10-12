@@ -31,12 +31,30 @@ public sealed class DesktopWallpaperBackend : IMonitorProvider, IWallpaperBacken
 
     public MonitorSetup CurrentSetup()
     {
-        var count = _dw.GetMonitorDevicePathCount();
+        // Re-create the COM object for the enumeration. The IDesktopWallpaper
+        // instance caches its monitor list, so a long-lived instance can report
+        // a STALE set right after a monitor is plugged in or removed (showing too
+        // few displays, or zero mid-reconfiguration). A fresh instance reflects
+        // the live display configuration.
+        IDesktopWallpaper dw;
+        try
+        {
+            var type = Type.GetTypeFromCLSID(new Guid(DesktopWallpaperClsid));
+            dw = type is not null
+                ? (IDesktopWallpaper)Activator.CreateInstance(type)!
+                : _dw;
+        }
+        catch
+        {
+            dw = _dw; // fall back to the cached instance
+        }
+
+        var count = dw.GetMonitorDevicePathCount();
         var monitors = new List<Monitor>();
 
         for (uint i = 0; i < count; i++)
         {
-            var deviceId = _dw.GetMonitorDevicePathAt(i);
+            var deviceId = dw.GetMonitorDevicePathAt(i);
             if (string.IsNullOrEmpty(deviceId))
             {
                 continue;
@@ -45,7 +63,7 @@ public sealed class DesktopWallpaperBackend : IMonitorProvider, IWallpaperBacken
             RECT rect;
             try
             {
-                rect = _dw.GetMonitorRECT(deviceId);
+                rect = dw.GetMonitorRECT(deviceId);
             }
             catch (COMException)
             {
@@ -63,6 +81,11 @@ public sealed class DesktopWallpaperBackend : IMonitorProvider, IWallpaperBacken
                 Y: rect.Top,
                 IsPrimary: rect.Left == 0 && rect.Top == 0,
                 FriendlyName: key));
+        }
+
+        if (!ReferenceEquals(dw, _dw))
+        {
+            Marshal.FinalReleaseComObject(dw);
         }
 
         return new MonitorSetup(monitors);

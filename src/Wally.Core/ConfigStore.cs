@@ -20,7 +20,7 @@ public static class ConfigStore
         var baseDir = string.IsNullOrEmpty(appData)
             ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
             : appData;
-        return Path.Combine(baseDir, "Wally", "config.json");
+        return Path.Combine(baseDir, "wally", "config.json");
     }
 
     private static readonly IReadOnlyDictionary<string, WallpaperFit> FitByName =
@@ -59,6 +59,7 @@ public static class ConfigStore
                     ["edid_key"] = m.EdidKey,
                     ["image_path"] = m.ImagePath,
                     ["fit"] = FitName(m.Fit),
+                    ["rotation_degrees"] = m.RotationDegrees,
                 });
             }
 
@@ -92,6 +93,7 @@ public static class ConfigStore
         {
             ["schema"] = SchemaVersion,
             ["new_desktop_behavior"] = config.NewDesktopBehavior,
+            ["gallery_folder"] = config.GalleryFolder,
             ["rotation_pool"] = rotation,
             ["setup_rules"] = setupRules,
             ["desktop_assignments"] = assignments,
@@ -127,7 +129,8 @@ public static class ConfigStore
                         perMonitor.Add(new MonitorRule(
                             EdidKey: m["edid_key"]!.GetValue<string>(),
                             ImagePath: m["image_path"]!.GetValue<string>(),
-                            Fit: ParseFit(m["fit"]?.GetValue<string>() ?? "fill")));
+                            Fit: ParseFit(m["fit"]?.GetValue<string>() ?? "fill"),
+                            RotationDegrees: m["rotation_degrees"]?.GetValue<int?>() ?? 0));
                     }
                 }
 
@@ -165,7 +168,10 @@ public static class ConfigStore
             SetupRules: setupRules,
             DesktopAssignments: assignments,
             NewDesktopBehavior: data["new_desktop_behavior"]?.GetValue<string>() ?? "open_manager",
-            RotationPool: rotation);
+            RotationPool: rotation)
+        {
+            GalleryFolder = data["gallery_folder"]?.GetValue<string>(),
+        };
     }
 
     private static string ToIndentedJson(JsonObject obj)
@@ -194,7 +200,7 @@ public static class ConfigStore
         }
         catch (Exception exc) when (exc is JsonException or FormatException or KeyNotFoundException or NullReferenceException)
         {
-            throw new FormatException($"Corrupt or invalid Wally config at {path}: {exc.Message}", exc);
+            throw new FormatException($"Corrupt or invalid wally config at {path}: {exc.Message}", exc);
         }
     }
 

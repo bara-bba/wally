@@ -80,7 +80,8 @@ public sealed partial record MonitorSetup(IReadOnlyList<Monitor> Monitors)
 public sealed record MonitorRule(
     string EdidKey,
     string ImagePath,
-    WallpaperFit Fit = WallpaperFit.Fill);
+    WallpaperFit Fit = WallpaperFit.Fill,
+    int RotationDegrees = 0);
 
 /// <summary>
 /// A complete rule for one monitor setup: a wallpaper per monitor.
@@ -154,6 +155,9 @@ public sealed partial record WallyConfig(
     }
 
     public IReadOnlyList<string> RotationPool { get; init; } = RotationPool ?? Array.Empty<string>();
+
+    /// <summary>Last chosen wallpapers folder for the gallery, reloaded on startup.</summary>
+    public string? GalleryFolder { get; init; }
 
     public SetupRule? RuleForSetup(string fingerprint)
     {

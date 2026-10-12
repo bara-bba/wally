@@ -32,7 +32,7 @@ public partial class App : Application
             backendError = ex.Message;
         }
 
-        var window = new MainWindow(backend, backendError);
+        var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"));
         _tray = new TrayIcon(window);
         window.Show();
     }
