@@ -50,6 +50,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MainWindow(DesktopWallpaperBackend? backend, string? backendError, bool simulate = false)
     {
         InitializeComponent();
+        Title = AppInfo.NameWithVersion;
         DataContext = this;
         _backend = backend;
         _backendError = backendError;

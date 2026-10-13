@@ -1,4 +1,4 @@
-# Wally
+# wally
 
 A Wallpaper-Engine-style wallpaper manager for Windows 11, focused on two things
 Wallpaper Engine handles poorly or not at all:
@@ -75,7 +75,7 @@ dotnet run --project src/Wally.App
 
 ## Distribution
 
-Wally ships as a **self-contained single-file executable** — one `Wally.exe`
+Wally ships as a **self-contained single-file executable** — one `wally.exe`
 with the .NET 8 runtime bundled in, so the target machine needs nothing
 preinstalled.
 
@@ -84,7 +84,7 @@ preinstalled.
 .\build\build-dist.ps1 -Runtime win-arm64
 ```
 
-Output: `dist\Wally.exe` (~68 MB; the size is the embedded runtime). The script
+Output: `dist\wally.exe` (~68 MB; the size is the embedded runtime). The script
 locates the SDK on PATH or falls back to `%USERPROFILE%\.dotnet`, verifying it
 actually has an SDK rather than trusting a bare `dotnet` shim.
 

@@ -169,7 +169,7 @@ public class CoreTests
                 new[]
                 {
                     new MonitorRule("A", "a.jpg", WallpaperFit.Fit),
-                    new MonitorRule("B", "b.jpg", WallpaperFit.Fill, RotationDegrees: 90),
+                    new MonitorRule("B", "b.jpg", WallpaperFit.Fill, RotationDegrees: 90, OffsetX: 0.5, OffsetY: -0.25),
                 },
                 DefaultImage: "d.jpg"))
             .WithDesktopAssignment(new DesktopAssignment("g1", "g.jpg"));
@@ -185,6 +185,18 @@ public class CoreTests
         {
             if (File.Exists(path)) File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void MonitorRule_OffsetDefaultsToZeroAndAffectsEquality()
+    {
+        var centered = new MonitorRule("A", "a.jpg");
+        Assert.Equal(0, centered.OffsetX);
+        Assert.Equal(0, centered.OffsetY);
+
+        var panned = centered with { OffsetX = 0.5 };
+        Assert.NotEqual(centered, panned);
+        Assert.Equal(0.5, panned.OffsetX);
     }
 
     [Fact]

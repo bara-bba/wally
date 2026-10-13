@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Build a self-contained single-file distribution of Wally.
+    Build a self-contained single-file distribution of wally.
 
 .DESCRIPTION
-    Produces one Wally.exe (win-x64) with the .NET 8 runtime bundled in, so the
+    Produces one wally.exe (win-x64) with the .NET 8 runtime bundled in, so the
     target machine needs nothing preinstalled. Output lands in dist/.
 
     The .NET SDK is required. If `dotnet` is not on PATH this script falls back
@@ -12,14 +12,25 @@
 .PARAMETER Runtime
     Target runtime identifier. Default win-x64. Use win-arm64 for ARM machines.
 
+.PARAMETER Version
+    Semantic version to stamp into the assembly and the output filename
+    (e.g. 0.2.0). When omitted, the default in Wally.App.csproj is used and the
+    output keeps the plain name wally.exe.
+
 .EXAMPLE
     .\build\build-dist.ps1
     .\build\build-dist.ps1 -Runtime win-arm64
+    .\build\build-dist.ps1 -Version 0.2.0
 #>
 [CmdletBinding()]
 param(
-    [string]$Runtime = 'win-x64'
+    [string]$Runtime = 'win-x64',
+    [string]$Version
 )
+
+if ($Version -and $Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+    throw "Version '$Version' is not a valid x.y.z[.w] version."
+}
 
 $ErrorActionPreference = 'Stop'
 
@@ -52,25 +63,41 @@ if ((Get-Command dotnet -ErrorAction SilentlyContinue) -and (Test-DotnetSdk 'dot
 }
 
 Write-Host "Using dotnet: $dotnet"
-Write-Host "Publishing Wally ($Runtime, self-contained single-file)..." -ForegroundColor Cyan
+$versionLabel = if ($Version) { $Version } else { 'csproj default' }
+Write-Host "Publishing wally ($Runtime, self-contained single-file, version: $versionLabel)..." -ForegroundColor Cyan
 
 # Clean previous dist output.
 if (Test-Path $distDir) {
     Remove-Item $distDir -Recurse -Force
 }
 
-& $dotnet publish $appProject `
-    -c Release `
-    -r $Runtime `
-    -o $distDir
+$publishArgs = @(
+    'publish', $appProject,
+    '-c', 'Release',
+    '-r', $Runtime,
+    '-o', $distDir
+)
+if ($Version) {
+    $publishArgs += "-p:Version=$Version"
+}
+
+& $dotnet @publishArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
 
-$exe = Join-Path $distDir 'Wally.exe'
+$exe = Join-Path $distDir 'wally.exe'
 if (-not (Test-Path $exe)) {
     throw "Publish completed but $exe was not produced."
+}
+
+# When a version is supplied, name the artifact so successive releases don't
+# clobber each other: wally-<version>.exe.
+if ($Version) {
+    $versionedExe = Join-Path $distDir "wally-$Version.exe"
+    Move-Item $exe $versionedExe -Force
+    $exe = $versionedExe
 }
 
 $sizeMb = [math]::Round((Get-Item $exe).Length / 1MB, 1)

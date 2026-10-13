@@ -30,7 +30,7 @@ public sealed class TrayIcon : IDisposable
         {
             Icon = BuildIcon(),
             Visible = true,
-            Text = "wally",
+            Text = AppInfo.NameWithVersion,
         };
 
         var menu = new WinFormsApp.ContextMenuStrip();

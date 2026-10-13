@@ -77,11 +77,20 @@ public sealed partial record MonitorSetup(IReadOnlyList<Monitor> Monitors)
 }
 
 /// <summary>Which wallpaper + fit to apply to one monitor within a setup.</summary>
+/// <remarks>
+/// <see cref="OffsetX"/>/<see cref="OffsetY"/> pan the image within the screen
+/// when it is cropped to fill (aspect ratios differ). They are NORMALISED to the
+/// range [-1, 1]: 0 is centred, -1/+1 push the crop fully to one edge, and the
+/// value is independent of preview or screen pixel size. Only the axis with
+/// spare image (the one being cropped) has any visible effect.
+/// </remarks>
 public sealed record MonitorRule(
     string EdidKey,
     string ImagePath,
     WallpaperFit Fit = WallpaperFit.Fill,
-    int RotationDegrees = 0);
+    int RotationDegrees = 0,
+    double OffsetX = 0,
+    double OffsetY = 0);
 
 /// <summary>
 /// A complete rule for one monitor setup: a wallpaper per monitor.

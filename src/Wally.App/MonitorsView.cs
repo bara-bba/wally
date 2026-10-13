@@ -151,10 +151,31 @@ public sealed class MonitorsView : UserControl
     {
         public required Monitor Monitor { get; init; }
         public required Border ScreenBorder { get; init; }
-        public required Image PreviewImage { get; init; }
+
+        // The wallpaper is painted as the screen border's background via an
+        // ImageBrush (UniformToFill). A brush fills the rectangle deterministically
+        // and clips for free — unlike an Image element, which measures to its
+        // aspect ratio and can leave the screen half-filled.
+        public ImageBrush PreviewBrush { get; } = new()
+        {
+            Stretch = Stretch.UniformToFill,
+            AlignmentX = AlignmentX.Center,
+            AlignmentY = AlignmentY.Center,
+        };
+
         public string? ImagePath { get; set; }
         public int RotationDegrees { get; set; }
         public ImageQuality Quality { get; set; } = ImageQuality.Good;
+
+        // Normalised pan offset in [-1, 1] per axis (0 = centred). Only the axis
+        // with spare image (the cropped one) moves the picture visibly.
+        public double OffsetX { get; set; }
+        public double OffsetY { get; set; }
+
+        // Pixel dimensions of the currently loaded (rotation-applied) bitmap,
+        // used to compute how far the image can pan within the screen frame.
+        public int BitmapWidth { get; set; }
+        public int BitmapHeight { get; set; }
 
         // The monitor's button in the single bottom bar.
         public Border? BarButton { get; set; }
@@ -181,7 +202,7 @@ public sealed class MonitorsView : UserControl
         headerText.Children.Add(new TextBlock { Text = "Monitors", Style = Res<Style>("PageTitle") });
         headerText.Children.Add(new TextBlock
         {
-            Text = "Drag an image from the gallery onto a display. Arranged like Windows display settings.",
+            Text = $"Drag an image from the gallery onto a display. Drag inside a display to reposition a cropped wallpaper. Arranged like Windows display settings.  ·  v{AppInfo.Version}",
             Style = Res<Style>("PageSubtitle"),
         });
         Grid.SetColumn(headerText, 0);
@@ -326,12 +347,6 @@ public sealed class MonitorsView : UserControl
 
         foreach (var m in setup.Monitors)
         {
-            var preview = new Image
-            {
-                Stretch = Stretch.UniformToFill,
-                Visibility = Visibility.Collapsed,
-            };
-
             var label = new TextBlock
             {
                 Text = m.IsPrimary ? $"{m.FriendlyName}  ·  primary" : m.FriendlyName,
@@ -345,28 +360,29 @@ public sealed class MonitorsView : UserControl
                 Margin = new Thickness(6),
             };
 
-            // Clean screen: just the preview and the name. No icons/bars/dots on it.
-            var content = new Grid();
-            content.Children.Add(preview);
-            content.Children.Add(label);
+            var slotColor = m.IsPrimary
+                ? Res<Brush>("AccentMuted")
+                : new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A));
 
+            // The wallpaper is the border's Background (an ImageBrush). The brush
+            // fills the rectangle (UniformToFill) and clips for free, so there is
+            // never a half-filled screen. The name label sits on top.
             var border = new Border
             {
                 CornerRadius = new CornerRadius(4),
-                Background = m.IsPrimary ? Res<Brush>("AccentMuted") : new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                Background = slotColor, // replaced by the ImageBrush once an image is assigned
                 BorderBrush = Res<Brush>("CardBorder"),
                 BorderThickness = new Thickness(1),
                 ClipToBounds = true,
                 AllowDrop = true,
                 Cursor = Cursors.Hand,
-                Child = content,
+                Child = label,
             };
 
             var slot = new MonitorSlot
             {
                 Monitor = m,
                 ScreenBorder = border,
-                PreviewImage = preview,
             };
             _slots[m.DeviceId] = slot;
 
@@ -374,6 +390,10 @@ public sealed class MonitorsView : UserControl
             border.DragEnter += (_, e) => OnDragOverMonitor(border, e);
             border.DragOver += (_, e) => OnDragOverMonitor(border, e);
             border.DragLeave += (_, _) => border.BorderBrush = Res<Brush>("CardBorder");
+
+            // Drag inside a screen to pan its wallpaper (when it has one and is
+            // cropped). Selecting happens on press so the pan acts on this slot.
+            AttachPanHandlers(slot);
 
             _layoutCanvas!.Children.Add(border);
         }
@@ -421,10 +441,10 @@ public sealed class MonitorsView : UserControl
         }
 
         // Remember current assignments by device id so still-present displays
-        // keep their wallpaper/rotation across the rebuild.
+        // keep their wallpaper/rotation/pan across the rebuild.
         var previous = _slots.Values
             .Where(s => s.ImagePath is not null)
-            .ToDictionary(s => s.Monitor.DeviceId, s => (s.ImagePath!, s.RotationDegrees));
+            .ToDictionary(s => s.Monitor.DeviceId, s => (s.ImagePath!, s.RotationDegrees, s.OffsetX, s.OffsetY));
 
         _layoutCanvas.Children.Clear();
         _controlsPanel?.Children.Clear();
@@ -439,6 +459,8 @@ public sealed class MonitorsView : UserControl
             {
                 slot.ImagePath = prev.Item1;
                 slot.RotationDegrees = prev.Item2;
+                slot.OffsetX = prev.Item3;
+                slot.OffsetY = prev.Item4;
                 RenderPreview(slot);
             }
         }
@@ -479,7 +501,9 @@ public sealed class MonitorsView : UserControl
                 EdidKey: slot.Monitor.EdidKey,
                 ImagePath: slot.ImagePath!,
                 Fit: WallpaperFit.Fill,
-                RotationDegrees: slot.RotationDegrees));
+                RotationDegrees: slot.RotationDegrees,
+                OffsetX: slot.OffsetX,
+                OffsetY: slot.OffsetY));
         }
 
         _config = _config.WithSetupRule(rule);
@@ -519,6 +543,8 @@ public sealed class MonitorsView : UserControl
             {
                 slot.ImagePath = mr.ImagePath;
                 slot.RotationDegrees = mr.RotationDegrees;
+                slot.OffsetX = mr.OffsetX;
+                slot.OffsetY = mr.OffsetY;
                 RenderPreview(slot);
             }
         }
@@ -553,9 +579,7 @@ public sealed class MonitorsView : UserControl
 
             try
             {
-                var path = mr.RotationDegrees % 360 != 0
-                    ? WriteRotatedCopy(mr.ImagePath, mr.RotationDegrees)
-                    : mr.ImagePath;
+                var path = ProcessedPathIfNeeded(mr.ImagePath, mr.RotationDegrees, mr.OffsetX, mr.OffsetY, slot.Monitor);
                 _backend.SetMonitorWallpaper(slot.Monitor.DeviceId, path, mr.Fit);
                 applied++;
             }
@@ -714,6 +738,14 @@ public sealed class MonitorsView : UserControl
             slot.ScreenBorder.Height = Math.Max(40, h - gap);
             Canvas.SetLeft(slot.ScreenBorder, left + gap / 2);
             Canvas.SetTop(slot.ScreenBorder, top + gap / 2);
+
+            // The pannable slack depends on the border size, which just changed —
+            // reposition the image so the offset stays visually consistent.
+            if (slot.ImagePath is not null)
+            {
+                slot.ScreenBorder.Dispatcher.BeginInvoke(new Action(() => ApplyPan(slot)),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+            }
         }
     }
 
@@ -746,10 +778,12 @@ public sealed class MonitorsView : UserControl
         AssignImage(slot, path);
     }
 
-    private void AssignImage(MonitorSlot slot, string path, int rotation = 0)
+    private void AssignImage(MonitorSlot slot, string path, int rotation = 0, double offsetX = 0, double offsetY = 0)
     {
         slot.ImagePath = path;
         slot.RotationDegrees = rotation;
+        slot.OffsetX = offsetX;
+        slot.OffsetY = offsetY;
         RenderPreview(slot);
         SelectMonitor(slot); // selecting the just-dropped monitor is the natural focus
     }
@@ -764,15 +798,18 @@ public sealed class MonitorsView : UserControl
         try
         {
             var bmp = LoadBitmap(slot.ImagePath, slot.RotationDegrees);
-            slot.PreviewImage.Source = bmp;
-            slot.PreviewImage.Visibility = Visibility.Visible;
+            slot.PreviewBrush.ImageSource = bmp;
+            slot.ScreenBorder.Background = slot.PreviewBrush;
 
             // Resolution quality (account for rotation swapping dimensions).
             var (iw, ih) = slot.RotationDegrees % 180 == 0
                 ? (bmp.PixelWidth, bmp.PixelHeight)
                 : (bmp.PixelHeight, bmp.PixelWidth);
+            slot.BitmapWidth = iw;
+            slot.BitmapHeight = ih;
             slot.Quality = ImageAdvisor.Assess(iw, ih, slot.Monitor.Width, slot.Monitor.Height);
             UpdateBarButton(slot, iw, ih);
+            ApplyPan(slot); // position the (possibly clamped) pan offset
         }
         catch (Exception ex)
         {
@@ -783,6 +820,177 @@ public sealed class MonitorsView : UserControl
                 slot.BarButton.ToolTip = $"Could not load image: {ex.Message}";
             }
         }
+    }
+
+    // --- Pan (move the wallpaper within a cropped screen) ------------------
+
+    // Pan drag state, scoped to the slot currently being dragged.
+    private MonitorSlot? _panSlot;
+    private Point _panStart;
+    private double _panStartOffsetX;
+    private double _panStartOffsetY;
+
+    /// <summary>
+    /// How many device-independent pixels the image can travel from centre on
+    /// each axis inside the screen frame (half the UniformToFill overflow). Zero
+    /// on an axis means that axis is not cropped, so panning it does nothing.
+    /// </summary>
+    private static (double maxX, double maxY) PanSlack(MonitorSlot slot)
+    {
+        var bw = slot.ScreenBorder.ActualWidth - slot.ScreenBorder.BorderThickness.Left - slot.ScreenBorder.BorderThickness.Right;
+        var bh = slot.ScreenBorder.ActualHeight - slot.ScreenBorder.BorderThickness.Top - slot.ScreenBorder.BorderThickness.Bottom;
+        if (bw <= 0 || bh <= 0 || slot.BitmapWidth <= 0 || slot.BitmapHeight <= 0)
+        {
+            return (0, 0);
+        }
+
+        // UniformToFill: scale so the image covers the frame; overflow is slack.
+        var scale = Math.Max(bw / slot.BitmapWidth, bh / slot.BitmapHeight);
+        var dispW = slot.BitmapWidth * scale;
+        var dispH = slot.BitmapHeight * scale;
+        return (Math.Max(0, (dispW - bw) / 2), Math.Max(0, (dispH - bh) / 2));
+    }
+
+    /// <summary>Position the preview image from the slot's normalised offset,
+    /// clamping to the available slack so no empty gutter is ever shown.
+    /// Panning is done by moving the brush's Viewbox (the source sub-rectangle),
+    /// which is the correct mechanism for an ImageBrush and leaves the
+    /// UniformToFill scaling intact.</summary>
+    private void ApplyPan(MonitorSlot slot)
+    {
+        var bw = slot.ScreenBorder.ActualWidth;
+        var bh = slot.ScreenBorder.ActualHeight;
+        if (bw <= 0 || bh <= 0 || slot.BitmapWidth <= 0 || slot.BitmapHeight <= 0)
+        {
+            // Not laid out yet — leave the brush filling (Stretch handles it).
+            slot.PreviewBrush.Viewbox = new Rect(0, 0, 1, 1);
+            slot.PreviewBrush.ViewboxUnits = BrushMappingMode.RelativeToBoundingBox;
+            slot.PreviewBrush.Stretch = Stretch.UniformToFill;
+            return;
+        }
+
+        var targetAspect = bw / bh;
+        var imageAspect = (double)slot.BitmapWidth / slot.BitmapHeight;
+
+        // Compute the normalised source sub-rectangle (0..1) that, when stretched
+        // to fill the screen, shows the "fill" crop. Then shift it by the offset.
+        double vw, vh;
+        if (imageAspect > targetAspect)
+        {
+            // Image wider than screen: use full height, crop width.
+            vh = 1.0;
+            vw = targetAspect / imageAspect;
+        }
+        else
+        {
+            // Image taller/narrower: use full width, crop height.
+            vw = 1.0;
+            vh = imageAspect / targetAspect;
+        }
+
+        var slackX = 1.0 - vw; // >= 0
+        var slackY = 1.0 - vh; // >= 0
+
+        // Clamp the offset to axes that actually have slack.
+        slot.OffsetX = slackX <= 0 ? 0 : Math.Clamp(slot.OffsetX, -1, 1);
+        slot.OffsetY = slackY <= 0 ? 0 : Math.Clamp(slot.OffsetY, -1, 1);
+
+        // offset -1 => show left/top edge, +1 => show right/bottom edge.
+        var vx = (slackX / 2) + slot.OffsetX * (slackX / 2);
+        var vy = (slackY / 2) + slot.OffsetY * (slackY / 2);
+
+        // With an explicit Viewbox the brush stretches that sub-rect to fill, so
+        // Stretch must be Fill (not UniformToFill) to avoid double-cropping.
+        slot.PreviewBrush.ViewboxUnits = BrushMappingMode.RelativeToBoundingBox;
+        slot.PreviewBrush.Viewbox = new Rect(vx, vy, vw, vh);
+        slot.PreviewBrush.Stretch = Stretch.Fill;
+        slot.PreviewBrush.RelativeTransform = null;
+    }
+
+    /// <summary>Attach press/drag/release handlers so dragging inside a screen
+    /// pans its wallpaper. Pannable only when the image has slack on an axis.</summary>
+    private void AttachPanHandlers(MonitorSlot slot)
+    {
+        var border = slot.ScreenBorder;
+
+        border.MouseLeftButtonDown += (_, e) =>
+        {
+            if (slot.ImagePath is null)
+            {
+                return;
+            }
+
+            SelectMonitor(slot);
+
+            var (maxX, maxY) = PanSlack(slot);
+            if (maxX <= 0 && maxY <= 0)
+            {
+                return; // nothing to pan (image fits exactly or is letterboxed)
+            }
+
+            _panSlot = slot;
+            _panStart = e.GetPosition(border);
+            _panStartOffsetX = slot.OffsetX;
+            _panStartOffsetY = slot.OffsetY;
+            border.CaptureMouse();
+            border.Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        };
+
+        border.MouseMove += (_, e) =>
+        {
+            if (_panSlot != slot || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
+            {
+                return;
+            }
+
+            var (maxX, maxY) = PanSlack(slot);
+            var now = e.GetPosition(border);
+            var dx = now.X - _panStart.X;
+            var dy = now.Y - _panStart.Y;
+
+            // Grab-and-drag feel: moving the cursor right should drag the picture
+            // right (revealing its left side). With the Viewbox model a positive
+            // offset reveals the right side, so the delta is negated.
+            if (maxX > 0)
+            {
+                slot.OffsetX = Math.Clamp(_panStartOffsetX - dx / maxX, -1, 1);
+            }
+
+            if (maxY > 0)
+            {
+                slot.OffsetY = Math.Clamp(_panStartOffsetY - dy / maxY, -1, 1);
+            }
+
+            ApplyPan(slot);
+            e.Handled = true;
+        };
+
+        void EndPan()
+        {
+            if (_panSlot == slot)
+            {
+                _panSlot = null;
+                border.ReleaseMouseCapture();
+                border.Cursor = Cursors.Hand;
+            }
+        }
+
+        border.MouseLeftButtonUp += (_, _) => EndPan();
+        border.LostMouseCapture += (_, _) => EndPan();
+
+        // Double-click recentres the wallpaper (undo a pan).
+        border.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ClickCount == 2 && slot.ImagePath is not null)
+            {
+                slot.OffsetX = 0;
+                slot.OffsetY = 0;
+                ApplyPan(slot);
+                SetStatus($"Recentred wallpaper on {slot.Monitor.FriendlyName}.");
+                e.Handled = true;
+            }
+        };
     }
 
     /// <summary>Select a monitor's bar button (white accent); clears the others.</summary>
@@ -931,13 +1139,8 @@ public sealed class MonitorsView : UserControl
         {
             try
             {
-                var pathToApply = slot.ImagePath!;
-
-                // If rotated, bake a rotated copy to a temp file (COM takes a path).
-                if (slot.RotationDegrees % 360 != 0)
-                {
-                    pathToApply = WriteRotatedCopy(slot.ImagePath!, slot.RotationDegrees);
-                }
+                var pathToApply = ProcessedPathIfNeeded(
+                    slot.ImagePath!, slot.RotationDegrees, slot.OffsetX, slot.OffsetY, slot.Monitor);
 
                 _backend.SetMonitorWallpaper(slot.Monitor.DeviceId, pathToApply, WallpaperFit.Fill);
                 applied++;
@@ -963,17 +1166,101 @@ public sealed class MonitorsView : UserControl
         }
     }
 
-    private static string WriteRotatedCopy(string sourcePath, int rotation)
+    /// <summary>
+    /// Return a path suitable for the COM backend. If the image needs no
+    /// rotation and no pan, the original path is used as-is. Otherwise a
+    /// processed copy is baked to a temp PNG: rotation applied, then (if an
+    /// offset is set and the image is cropped at the monitor's aspect ratio) the
+    /// image is cropped to the monitor aspect at the chosen pan position, so the
+    /// desktop shows exactly what the preview showed.
+    /// </summary>
+    private static string ProcessedPathIfNeeded(string sourcePath, int rotation, double offsetX, double offsetY, Monitor monitor)
     {
+        var needsRotation = rotation % 360 != 0;
+        var needsPan = offsetX != 0 || offsetY != 0;
+        if (!needsRotation && !needsPan)
+        {
+            return sourcePath;
+        }
+
+        // Rotation-applied bitmap first.
         var bmp = LoadBitmap(sourcePath, rotation);
+        BitmapSource source = bmp;
+
+        if (needsPan && monitor.Width > 0 && monitor.Height > 0)
+        {
+            source = CropToAspect(bmp, monitor.Width, monitor.Height, offsetX, offsetY);
+        }
+
         var dir = Path.Combine(Path.GetTempPath(), "wally");
         Directory.CreateDirectory(dir);
-        var outPath = Path.Combine(dir, $"rot{rotation}_{Path.GetFileNameWithoutExtension(sourcePath)}.png");
+        var tag = needsPan ? $"rot{rotation}_pan_" : $"rot{rotation}_";
+        var outPath = Path.Combine(dir, $"{tag}{Path.GetFileNameWithoutExtension(sourcePath)}.png");
         using var fs = new FileStream(outPath, FileMode.Create);
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        encoder.Frames.Add(BitmapFrame.Create(source));
         encoder.Save(fs);
         return outPath;
+    }
+
+    /// <summary>
+    /// Crop <paramref name="bmp"/> to the target aspect ratio (fill style), with
+    /// the crop window shifted by the normalised pan offset in [-1, 1]. This
+    /// mirrors the preview's UniformToFill + translate so the baked image matches
+    /// what the user positioned on screen.
+    /// </summary>
+    private static BitmapSource CropToAspect(BitmapSource bmp, int targetW, int targetH, double offsetX, double offsetY)
+    {
+        double iw = bmp.PixelWidth;
+        double ih = bmp.PixelHeight;
+        var targetAspect = (double)targetW / targetH;
+        var imageAspect = iw / ih;
+
+        double cropW, cropH;
+        if (imageAspect > targetAspect)
+        {
+            // Image is wider than the screen: full height, crop the width.
+            cropH = ih;
+            cropW = ih * targetAspect;
+        }
+        else
+        {
+            // Image is taller/narrower: full width, crop the height.
+            cropW = iw;
+            cropH = iw / targetAspect;
+        }
+
+        var slackX = iw - cropW; // >= 0
+        var slackY = ih - cropH; // >= 0
+
+        // Match the preview's Viewbox mapping: offset -1 shows the left/top
+        // edge, +1 shows the right/bottom edge. Crop origin moves with +offset.
+        var cx = Math.Clamp((slackX / 2) + offsetX * (slackX / 2), 0, slackX);
+        var cy = Math.Clamp((slackY / 2) + offsetY * (slackY / 2), 0, slackY);
+
+        var rect = new Int32Rect(
+            (int)Math.Round(cx),
+            (int)Math.Round(cy),
+            Math.Max(1, (int)Math.Round(cropW)),
+            Math.Max(1, (int)Math.Round(cropH)));
+
+        // Guard against rounding pushing the rect past the bitmap bounds.
+        if (rect.X + rect.Width > bmp.PixelWidth)
+        {
+            rect.X = bmp.PixelWidth - rect.Width;
+        }
+
+        if (rect.Y + rect.Height > bmp.PixelHeight)
+        {
+            rect.Y = bmp.PixelHeight - rect.Height;
+        }
+
+        rect.X = Math.Max(0, rect.X);
+        rect.Y = Math.Max(0, rect.Y);
+
+        var cropped = new CroppedBitmap(bmp, rect);
+        cropped.Freeze();
+        return cropped;
     }
 
     // --- Gallery strip -----------------------------------------------------

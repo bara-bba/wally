@@ -54,13 +54,27 @@ public static class ConfigStore
             var perMonitor = new JsonArray();
             foreach (var m in r.PerMonitor)
             {
-                perMonitor.Add(new JsonObject
+                var mObj = new JsonObject
                 {
                     ["edid_key"] = m.EdidKey,
                     ["image_path"] = m.ImagePath,
                     ["fit"] = FitName(m.Fit),
                     ["rotation_degrees"] = m.RotationDegrees,
-                });
+                };
+
+                // Only persist a pan offset when it is actually set, so existing
+                // configs stay clean and the field is purely additive.
+                if (m.OffsetX != 0)
+                {
+                    mObj["offset_x"] = m.OffsetX;
+                }
+
+                if (m.OffsetY != 0)
+                {
+                    mObj["offset_y"] = m.OffsetY;
+                }
+
+                perMonitor.Add(mObj);
             }
 
             setupRules.Add(new JsonObject
@@ -130,7 +144,9 @@ public static class ConfigStore
                             EdidKey: m["edid_key"]!.GetValue<string>(),
                             ImagePath: m["image_path"]!.GetValue<string>(),
                             Fit: ParseFit(m["fit"]?.GetValue<string>() ?? "fill"),
-                            RotationDegrees: m["rotation_degrees"]?.GetValue<int?>() ?? 0));
+                            RotationDegrees: m["rotation_degrees"]?.GetValue<int?>() ?? 0,
+                            OffsetX: m["offset_x"]?.GetValue<double?>() ?? 0,
+                            OffsetY: m["offset_y"]?.GetValue<double?>() ?? 0));
                     }
                 }
 
