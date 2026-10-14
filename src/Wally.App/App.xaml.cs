@@ -32,7 +32,19 @@ public partial class App : Application
             backendError = ex.Message;
         }
 
-        var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"));
+        // Virtual-desktop service is best-effort: if the documented COM class is
+        // unavailable, the Desktops view degrades to an informational message.
+        VirtualDesktopService? vds = null;
+        try
+        {
+            vds = new VirtualDesktopService();
+        }
+        catch
+        {
+            vds = null;
+        }
+
+        var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"), vds);
         _tray = new TrayIcon(window);
         window.Show();
     }

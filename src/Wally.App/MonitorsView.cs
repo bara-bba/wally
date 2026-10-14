@@ -198,21 +198,29 @@ public sealed class MonitorsView : UserControl
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var headerText = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        // Leave a gap on the right so the (star-width) text column never runs
+        // under the auto-width action buttons in column 1.
+        var headerText = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 16, 0),
+        };
         headerText.Children.Add(new TextBlock { Text = "Monitors", Style = Res<Style>("PageTitle") });
         headerText.Children.Add(new TextBlock
         {
             Text = $"Drag an image from the gallery onto a display. Drag inside a display to reposition a cropped wallpaper. Arranged like Windows display settings.  ·  v{AppInfo.Version}",
             Style = Res<Style>("PageSubtitle"),
+            TextWrapping = TextWrapping.Wrap,
         });
         Grid.SetColumn(headerText, 0);
         header.Children.Add(headerText);
 
-        // Right side: Save setup + Refresh.
+        // Right side: Save setup + Refresh. Top-aligned so they stay level with
+        // the title when the subtitle wraps to more than one line.
         var headerActions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
         };
 
         var saveSetup = new Button
@@ -801,10 +809,13 @@ public sealed class MonitorsView : UserControl
             slot.PreviewBrush.ImageSource = bmp;
             slot.ScreenBorder.Background = slot.PreviewBrush;
 
-            // Resolution quality (account for rotation swapping dimensions).
-            var (iw, ih) = slot.RotationDegrees % 180 == 0
-                ? (bmp.PixelWidth, bmp.PixelHeight)
-                : (bmp.PixelHeight, bmp.PixelWidth);
+            // BitmapImage.Rotation already bakes the rotation into the returned
+            // bitmap, so PixelWidth/PixelHeight are the final (rotated)
+            // dimensions — use them directly. Swapping again here would feed the
+            // pan/aspect math the wrong orientation and stretch the image on the
+            // wrong axis (e.g. a vertical photo rotated to fit a wide monitor).
+            var iw = bmp.PixelWidth;
+            var ih = bmp.PixelHeight;
             slot.BitmapWidth = iw;
             slot.BitmapHeight = ih;
             slot.Quality = ImageAdvisor.Assess(iw, ih, slot.Monitor.Width, slot.Monitor.Height);

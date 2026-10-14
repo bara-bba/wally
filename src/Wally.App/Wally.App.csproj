@@ -14,6 +14,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>wally</AssemblyName>
 
+    <!-- Taskbar / Explorer / Alt-Tab icon (baked into the exe). The window and
+         tray icons are drawn from the same brand mark at runtime (BrandMark). -->
+    <ApplicationIcon>wally.ico</ApplicationIcon>
+
     <!-- Version applies to every build (Debug and Release) so the running app
          can always read it. This is the DEFAULT; a build can override it with
          `-p:Version=x.y.z` (build-dist.ps1 -Version does exactly that), and an

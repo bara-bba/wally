@@ -4,11 +4,23 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wally.App"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="wally" Height="640" Width="1000"
         MinHeight="480" MinWidth="760"
         Background="{StaticResource AppBackground}"
         FontFamily="{StaticResource AppFont}">
+    <shell:WindowChrome.WindowChrome>
+        <!-- Remove the OS titlebar entirely while keeping native resize,
+             Aero snap, and taskbar behaviour. CaptionHeight=0 means the whole
+             client area is content; the custom drag strip below re-adds a move
+             region via WindowChrome.IsHitTestVisibleInChrome on its buttons. -->
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="NavColumn" Width="60" />
@@ -66,11 +78,74 @@
             </DockPanel>
         </Border>
 
-        <!-- Content host: a bounded (non-scrolling) area. Views that need to
-             scroll manage it internally; a scrolling host here would give the
-             Monitors view infinite height and break its star-row layout. -->
-        <Border Grid.Column="1" Padding="32,24,32,24">
-            <ContentControl x:Name="ContentHost" />
-        </Border>
+        <!-- Content column: a slim custom caption strip (drag + window buttons)
+             over the bounded content host. The strip replaces the removed OS
+             titlebar so the window stays movable and closable. -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="34" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Caption strip: whole strip is a drag region; the buttons opt out
+                 of the drag so they remain clickable. -->
+            <Grid Grid.Row="0" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Minimize / Close -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="MinimizeButton" Width="40" Height="34"
+                            Click="MinimizeButton_Click" Cursor="Hand"
+                            ToolTip="Minimize"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource TextSecondary}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="b" Background="Transparent">
+                                    <TextBlock Text="&#xE921;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="b" Property="Background" Value="{StaticResource CardHover}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="CloseButton" Width="40" Height="34"
+                            Click="CloseButton_Click" Cursor="Hand"
+                            ToolTip="Close to tray"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource TextSecondary}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="b" Background="Transparent">
+                                    <TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                               FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="b" Property="Background" Value="#C42B1C" />
+                                        <Setter TargetName="b" Property="TextElement.Foreground" Value="White" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Content host: a bounded (non-scrolling) area. Views that need to
+                 scroll manage it internally; a scrolling host here would give the
+                 Monitors view infinite height and break its star-row layout. -->
+            <Border Grid.Row="1" Padding="32,8,32,24">
+                <ContentControl x:Name="ContentHost" />
+            </Border>
+        </Grid>
     </Grid>
 </Window>
