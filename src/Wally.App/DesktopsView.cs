@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -35,8 +35,12 @@ namespace Wally.App;
 /// assigned wallpaper to all monitors — immediately on demand, and automatically
 /// when a desktop switch is detected (the "detect and swap" strategy).
 /// </summary>
-public sealed class DesktopsView : UserControl
+public sealed class DesktopsView : UserControl, IShellPage
 {
+    public string PageTitle => "Virtual desktops";
+
+    public FrameworkElement? HeaderActions { get; private set; }
+
     private const string DragFormat = "wally/image-path";
 
     private readonly DesktopWallpaperBackend? _backend;
@@ -81,6 +85,7 @@ public sealed class DesktopsView : UserControl
         public required Image Preview { get; init; }
         public required TextBlock Caption { get; init; }
         public string? ImagePath { get; set; }
+        public int Rotation { get; set; }
         public int Index { get; set; }
     }
 
@@ -93,52 +98,16 @@ public sealed class DesktopsView : UserControl
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // gallery (fills rest)
 
-        // Header: title/subtitle on the left, Refresh on the right.
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        // Leave a gap on the right so the (star-width) text column never runs
-        // under the auto-width Refresh button in column 1.
-        var headerText = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 16, 0),
-        };
-        headerText.Children.Add(new TextBlock { Text = "Virtual desktops", Style = Res<Style>("PageTitle") });
-        headerText.Children.Add(new TextBlock
-        {
-            Text = "Assign a wallpaper to each virtual desktop. wally swaps it in automatically when you switch desktops. "
-                 + "New desktops appear here once you switch to them.",
-            Style = Res<Style>("PageSubtitle"),
-            TextWrapping = TextWrapping.Wrap,
-        });
-        Grid.SetColumn(headerText, 0);
-        header.Children.Add(headerText);
-
+        // Clony layout: title lives in the shell header; Refresh is published
+        // there via IShellPage.HeaderActions.
         var refresh = new Button
         {
-            Style = Res<Style>("SubtleButton"),
-            VerticalAlignment = VerticalAlignment.Top,
-            ToolTip = "Re-scan virtual desktops (use after creating or switching to a new desktop)",
+            Style = Res<Style>("ToolIconButton"),
+            ToolTip = "Refresh — re-scan virtual desktops and reload the gallery folder",
+            Content = GlyphIcon.Create("\u27F3"),
         };
-        var refreshContent = new StackPanel { Orientation = Orientation.Horizontal };
-        refreshContent.Children.Add(new TextBlock
-        {
-            Text = "\uE72C",
-            FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
-            FontSize = 13,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0),
-        });
-        refreshContent.Children.Add(new TextBlock { Text = "Refresh", VerticalAlignment = VerticalAlignment.Center });
-        refresh.Content = refreshContent;
         refresh.Click += (_, _) => RefreshDesktops();
-        Grid.SetColumn(refresh, 1);
-        header.Children.Add(refresh);
-
-        Grid.SetRow(header, 0);
-        root.Children.Add(header);
+        HeaderActions = refresh;
 
         // Desktop cards (horizontal strip).
         var listHost = new Border
@@ -168,6 +137,16 @@ public sealed class DesktopsView : UserControl
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 10, 0, 0),
         };
+        var rotate = new Button
+        {
+            Content = "Rotate 90°",
+            Style = Res<Style>("SubtleButton"),
+            Margin = new Thickness(0, 0, 8, 0),
+            ToolTip = "Rotate the selected desktop's wallpaper 90° clockwise.",
+        };
+        rotate.Click += (_, _) => RotateSelected();
+        actions.Children.Add(rotate);
+
         var setWallpaper = new Button
         {
             Content = "Set wallpaper",
@@ -244,6 +223,12 @@ public sealed class DesktopsView : UserControl
     /// added; existing cards keep their assignment.</summary>
     private void RefreshDesktops()
     {
+        // Pick up images newly added to the wallpaper folder.
+        if (!string.IsNullOrEmpty(_config.GalleryFolder) && Directory.Exists(_config.GalleryFolder))
+        {
+            LoadGallery(_config.GalleryFolder);
+        }
+
         var guids = _vds?.ListDesktopGuids() ?? Array.Empty<string>();
         var before = _cards.Count;
         foreach (var g in guids)
@@ -271,6 +256,7 @@ public sealed class DesktopsView : UserControl
             if (imagePath is not null && existing.ImagePath != imagePath)
             {
                 existing.ImagePath = imagePath;
+                existing.Rotation = _config.AssignmentForDesktop(guid)?.RotationDegrees ?? 0;
                 RenderCardPreview(existing);
             }
 
@@ -284,7 +270,7 @@ public sealed class DesktopsView : UserControl
             Height = 120,
             CornerRadius = new CornerRadius(4),
             ClipToBounds = true,
-            Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+            Background = Res<Brush>("Subtle"),
             Child = preview,
         };
 
@@ -324,6 +310,7 @@ public sealed class DesktopsView : UserControl
             Preview = preview,
             Caption = caption,
             ImagePath = imagePath,
+            Rotation = _config.AssignmentForDesktop(guid)?.RotationDegrees ?? 0,
         };
 
         cardRoot.Drop += (_, e) => OnDropOnDesktop(card, e);
@@ -400,6 +387,7 @@ public sealed class DesktopsView : UserControl
             bmp.CacheOption = BitmapCacheOption.OnLoad;
             bmp.DecodePixelWidth = 300;
             bmp.UriSource = new Uri(card.ImagePath);
+            bmp.Rotation = ToRotation(card.Rotation);
             bmp.EndInit();
             bmp.Freeze();
             card.Preview.Source = bmp;
@@ -435,13 +423,14 @@ public sealed class DesktopsView : UserControl
 
         var path = (string)e.Data.GetData(DragFormat);
         card.ImagePath = path;
+        card.Rotation = 0; // a new image starts upright
         RenderCardPreview(card);
 
         // Persist the assignment for this desktop guid.
-        _config = _config.WithDesktopAssignment(new DesktopAssignment(card.Guid, path, WallpaperFit.Fill));
+        var assignment = new DesktopAssignment(card.Guid, path, WallpaperFit.Fill);
         try
         {
-            ConfigStore.Save(_config);
+            _config = ConfigStore.Update(c => c.WithDesktopAssignment(assignment));
             SetStatusAccent($"Assigned to {card.Caption.Text}. It will apply when you switch to this desktop.");
         }
         catch (Exception ex)
@@ -461,7 +450,9 @@ public sealed class DesktopsView : UserControl
     /// exists for the new desktop, highlights it, and applies its assigned
     /// wallpaper (or the auto-assign rotation image for a brand-new desktop).
     /// </summary>
-    public void OnDesktopChanged(string guid)
+    /// <param name="applyWallpaper">False when the host already applied a saved
+    /// monitor setup, which takes priority over the desktop's own wallpaper.</param>
+    public void OnDesktopChanged(string guid, bool applyWallpaper = true)
     {
         var assignment = _config.AssignmentForDesktop(guid);
         var imagePath = assignment?.ImagePath;
@@ -473,17 +464,26 @@ public sealed class DesktopsView : UserControl
             imagePath = RulesEngine.NextRotationImage(_config, used);
             if (imagePath is not null)
             {
-                _config = _config.WithDesktopAssignment(new DesktopAssignment(guid, imagePath, WallpaperFit.Fill));
-                try { ConfigStore.Save(_config); } catch { /* non-fatal */ }
+                var auto = new DesktopAssignment(guid, imagePath, WallpaperFit.Fill);
+                _config = _config.WithDesktopAssignment(auto);
+                try { _config = ConfigStore.Update(c => c.WithDesktopAssignment(auto)); } catch { /* non-fatal */ }
             }
         }
 
         EnsureCard(guid, imagePath);
         SetCurrent(guid);
 
+        if (!applyWallpaper)
+        {
+            // A saved monitor setup matched the connected displays and was
+            // applied instead; it takes priority over the per-desktop wallpaper.
+            SetStatusAccent("Switched desktop — your saved monitor setup takes priority and was applied.");
+            return;
+        }
+
         if (imagePath is not null && File.Exists(imagePath))
         {
-            ApplyToAllMonitors(imagePath);
+            ApplyToAllMonitors(imagePath, assignment?.RotationDegrees ?? 0);
             SetStatusAccent($"Switched desktop — applied the assigned wallpaper.");
         }
         else
@@ -509,11 +509,81 @@ public sealed class DesktopsView : UserControl
             return;
         }
 
-        ApplyToAllMonitors(card.ImagePath);
+        ApplyToAllMonitors(card.ImagePath, card.Rotation);
         SetStatusAccent($"Applied Desktop {card.Index}'s wallpaper to all monitors.");
     }
 
-    private void ApplyToAllMonitors(string imagePath)
+    /// <summary>Rotate the selected desktop's wallpaper 90°, save it, and
+    /// re-apply when that desktop is the one on screen.</summary>
+    private void RotateSelected()
+    {
+        var guid = string.IsNullOrEmpty(_selectedGuid) ? _currentGuid : _selectedGuid;
+        if (string.IsNullOrEmpty(guid) || !_cards.TryGetValue(guid, out var card)
+            || card.ImagePath is null || !File.Exists(card.ImagePath))
+        {
+            SetStatus("Select a desktop with a wallpaper first, then rotate.");
+            return;
+        }
+
+        card.Rotation = (card.Rotation + 90) % 360;
+        RenderCardPreview(card);
+
+        var assignment = new DesktopAssignment(card.Guid, card.ImagePath, WallpaperFit.Fill, card.Rotation);
+        try
+        {
+            _config = ConfigStore.Update(c => c.WithDesktopAssignment(assignment));
+            SetStatusAccent($"Rotated Desktop {card.Index} to {card.Rotation}°.");
+        }
+        catch (Exception ex)
+        {
+            SetStatusError($"Could not save rotation: {ex.Message}");
+        }
+
+        if (_vds?.CurrentDesktopGuid() == card.Guid)
+        {
+            ApplyToAllMonitors(card.ImagePath, card.Rotation);
+        }
+    }
+
+    private static Rotation ToRotation(int degrees) => degrees switch
+    {
+        90 => Rotation.Rotate90,
+        180 => Rotation.Rotate180,
+        270 => Rotation.Rotate270,
+        _ => Rotation.Rotate0,
+    };
+
+    /// <summary>
+    /// The path to hand Windows: the original when upright, otherwise a rotated
+    /// PNG copy baked into %TEMP%\wally (Windows itself cannot rotate wallpaper).
+    /// </summary>
+    private static string RotatedPathIfNeeded(string sourcePath, int rotation)
+    {
+        if (rotation % 360 == 0)
+        {
+            return sourcePath;
+        }
+
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+        bmp.UriSource = new Uri(sourcePath);
+        bmp.Rotation = ToRotation(rotation);
+        bmp.EndInit();
+        bmp.Freeze();
+
+        var dir = Path.Combine(Path.GetTempPath(), "wally");
+        Directory.CreateDirectory(dir);
+        var outPath = Path.Combine(dir, $"desk_rot{rotation}_{Path.GetFileNameWithoutExtension(sourcePath)}.png");
+        using var fs = new FileStream(outPath, FileMode.Create);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        encoder.Save(fs);
+        return outPath;
+    }
+
+    private void ApplyToAllMonitors(string imagePath, int rotation = 0)
     {
         if (_simulated || _backend is null)
         {
@@ -523,10 +593,11 @@ public sealed class DesktopsView : UserControl
 
         try
         {
+            var pathToApply = RotatedPathIfNeeded(imagePath, rotation);
             var setup = _backend.CurrentSetup();
             foreach (var m in setup.Monitors)
             {
-                _backend.SetMonitorWallpaper(m.DeviceId, imagePath, WallpaperFit.Fill);
+                _backend.SetMonitorWallpaper(m.DeviceId, pathToApply, WallpaperFit.Fill);
             }
         }
         catch (Exception ex)
@@ -558,10 +629,8 @@ public sealed class DesktopsView : UserControl
         headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         headerRow.Children.Add(new TextBlock
         {
-            Text = "Gallery",
-            Foreground = Res<Brush>("TextSecondary"),
-            FontWeight = FontWeights.SemiBold,
-            FontSize = 13,
+            Text = "GALLERY",
+            Style = Res<Style>("CardLabel"),
             VerticalAlignment = VerticalAlignment.Center,
         });
         var pick = new Button { Content = "Choose folder…", Style = Res<Style>("SubtleButton") };
@@ -613,8 +682,8 @@ public sealed class DesktopsView : UserControl
         LoadGallery(dlg.FolderName);
         try
         {
-            _config = _config with { GalleryFolder = dlg.FolderName };
-            ConfigStore.Save(_config);
+            var folder = dlg.FolderName;
+            _config = ConfigStore.Update(c => c with { GalleryFolder = folder });
         }
         catch { /* non-fatal */ }
     }
@@ -635,7 +704,7 @@ public sealed class DesktopsView : UserControl
             _galleryPanel.Children.Add(new TextBlock
             {
                 Text = $"Could not read folder: {ex.Message}",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
+                Foreground = Res<Brush>("Bad"),
                 FontSize = 12,
             });
             return;
@@ -687,7 +756,7 @@ public sealed class DesktopsView : UserControl
             BorderThickness = new Thickness(1),
             ClipToBounds = true,
             Cursor = Cursors.Hand,
-            Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+            Background = Res<Brush>("Subtle"),
             Child = img,
             ToolTip = Path.GetFileName(path),
         };
@@ -720,7 +789,7 @@ public sealed class DesktopsView : UserControl
 
     private void SetStatusError(string text)
     {
-        if (_statusLabel is not null) { _statusLabel.Text = text; _statusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)); }
+        if (_statusLabel is not null) { _statusLabel.Text = text; _statusLabel.Foreground = Res<Brush>("Bad"); }
     }
 
     private T Res<T>(string key) => (T)FindResource(key);

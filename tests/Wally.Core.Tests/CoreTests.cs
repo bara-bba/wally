@@ -220,4 +220,56 @@ public class CoreTests
             if (File.Exists(path)) File.Delete(path);
         }
     }
+
+    [Fact]
+    public void DesktopRotation_RoundTripsThroughSaveAndLoad()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"wally-rot-{Guid.NewGuid():N}.json");
+        try
+        {
+            var cfg = new WallyConfig().WithDesktopAssignment(new DesktopAssignment("g1", "a.jpg", WallpaperFit.Fill, 270));
+            ConfigStore.Save(cfg, path);
+            Assert.Equal(270, ConfigStore.Load(path).AssignmentForDesktop("g1")!.RotationDegrees);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void AccentColor_RoundTripsThroughSaveAndLoad()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"wally-accent-{Guid.NewGuid():N}.json");
+        try
+        {
+            ConfigStore.Save(new WallyConfig() with { AccentColor = "#12A39A" }, path);
+            Assert.Equal("#12A39A", ConfigStore.Load(path).AccentColor);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Update_PreservesFieldsChangedElsewhere()
+    {
+        // Two views each hold their own copy; saving one view's change must not
+        // wipe the other's (the accent colour was being lost this way).
+        var path = Path.Combine(Path.GetTempPath(), $"wally-update-{Guid.NewGuid():N}.json");
+        try
+        {
+            ConfigStore.Update(c => c with { AccentColor = "#8B5CF6" }, path);
+            ConfigStore.Update(c => c with { GalleryFolder = @"C:\walls" }, path);
+
+            var loaded = ConfigStore.Load(path);
+            Assert.Equal("#8B5CF6", loaded.AccentColor);
+            Assert.Equal(@"C:\walls", loaded.GalleryFolder);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
 }

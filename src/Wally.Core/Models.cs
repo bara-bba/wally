@@ -149,7 +149,8 @@ public sealed partial record SetupRule(
 public sealed record DesktopAssignment(
     string DesktopGuid,
     string ImagePath,
-    WallpaperFit Fit = WallpaperFit.Fill);
+    WallpaperFit Fit = WallpaperFit.Fill,
+    int RotationDegrees = 0);
 
 /// <summary>Top-level persisted state.</summary>
 public sealed partial record WallyConfig(
@@ -167,6 +168,9 @@ public sealed partial record WallyConfig(
 
     /// <summary>Last chosen wallpapers folder for the gallery, reloaded on startup.</summary>
     public string? GalleryFolder { get; init; }
+
+    /// <summary>User-selected accent colour as "#RRGGBB". Null = app default.</summary>
+    public string? AccentColor { get; init; }
 
     public SetupRule? RuleForSetup(string fingerprint)
     {

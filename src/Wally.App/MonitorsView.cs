@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -38,8 +38,12 @@ namespace Wally.App;
 /// and offers a draggable gallery strip along the bottom. Images are dragged
 /// from the gallery onto a monitor to assign them.
 /// </summary>
-public sealed class MonitorsView : UserControl
+public sealed class MonitorsView : UserControl, IShellPage
 {
+    public string PageTitle => "Monitors";
+
+    public FrameworkElement? HeaderActions { get; private set; }
+
     private const string DragFormat = "wally/image-path";
 
     private readonly DesktopWallpaperBackend? _backend;
@@ -193,80 +197,26 @@ public sealed class MonitorsView : UserControl
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });  // splitter
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1.4, GridUnitType.Star), MinHeight = 150 }); // gallery (resizable, larger)
 
-        // Header: title/subtitle on the left, a Refresh button on the right.
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        // Clony layout: the page title lives in the shell header, so the page
+        // has no title block. Its Save setup + Refresh buttons are published to
+        // the shell header via IShellPage.HeaderActions.
+        var headerActions = new StackPanel { Orientation = Orientation.Horizontal };
 
-        // Leave a gap on the right so the (star-width) text column never runs
-        // under the auto-width action buttons in column 1.
-        var headerText = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 16, 0),
-        };
-        headerText.Children.Add(new TextBlock { Text = "Monitors", Style = Res<Style>("PageTitle") });
-        headerText.Children.Add(new TextBlock
-        {
-            Text = $"Drag an image from the gallery onto a display. Drag inside a display to reposition a cropped wallpaper. Arranged like Windows display settings.  ·  v{AppInfo.Version}",
-            Style = Res<Style>("PageSubtitle"),
-            TextWrapping = TextWrapping.Wrap,
-        });
-        Grid.SetColumn(headerText, 0);
-        header.Children.Add(headerText);
-
-        // Right side: Save setup + Refresh. Top-aligned so they stay level with
-        // the title when the subtitle wraps to more than one line.
-        var headerActions = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Top,
-        };
-
-        var saveSetup = new Button
-        {
-            Content = "Save setup",
-            Style = Res<Style>("SubtleButton"),
-            Margin = new Thickness(0, 0, 8, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "Remember the current wallpaper on each display for this exact set of monitors. "
-                    + "When this set is detected again, wally re-applies it automatically.",
-        };
+        var saveSetup = IconButton(
+            "\U0001F5AB", // 🖫 save (floppy), Segoe UI Symbol
+            "Save setup — remember the current wallpaper on each display for this exact set of monitors. "
+                + "When this set is detected again, wally re-applies it automatically.");
+        saveSetup.Margin = new Thickness(0, 0, 8, 0);
         saveSetup.Click += (_, _) => SaveCurrentSetup();
         headerActions.Children.Add(saveSetup);
 
-        var refresh = new Button
-        {
-            Style = Res<Style>("SubtleButton"),
-            VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "Re-read connected displays (use after plugging in or removing a monitor)",
-        };
-        // Compose icon + label as separate runs so the Fluent glyph never
-        // bleeds into the text font (the earlier mixed-font string showed a
-        // tofu box). Icon in the symbol font, label in the UI font.
-        var refreshContent = new StackPanel { Orientation = Orientation.Horizontal };
-        refreshContent.Children.Add(new TextBlock
-        {
-            Text = "\uE72C",
-            FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
-            FontSize = 13,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0),
-        });
-        refreshContent.Children.Add(new TextBlock
-        {
-            Text = "Refresh",
-            VerticalAlignment = VerticalAlignment.Center,
-        });
-        refresh.Content = refreshContent;
-        refresh.Click += (_, _) => RefreshMonitors();
+        var refresh = IconButton(
+            "\u27F3", // ⟳ refresh — same glyph as Picky's gallery toolbar
+            "Refresh — re-read connected displays and reload the gallery folder "
+                + "(use after plugging in a monitor or adding images to the folder).");
+        refresh.Click += (_, _) => RefreshAll();
         headerActions.Children.Add(refresh);
-
-        Grid.SetColumn(headerActions, 1);
-        header.Children.Add(headerActions);
-
-        Grid.SetRow(header, 0);
-        root.Children.Add(header);
+        HeaderActions = headerActions;
 
         // Layout + per-monitor controls share row 1: canvas fills, controls dock bottom.
         var layoutHost = new Border
@@ -279,6 +229,17 @@ public sealed class MonitorsView : UserControl
             MinHeight = 180,
         };
         var layoutDock = new DockPanel { LastChildFill = true };
+
+        var layoutLabel = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
+        layoutLabel.Children.Add(new TextBlock { Text = "DISPLAYS", Style = Res<Style>("CardLabel") });
+        layoutLabel.Children.Add(new TextBlock
+        {
+            Text = "Drag an image from the gallery onto a display. Drag inside a display to reposition a cropped wallpaper.",
+            Style = Res<Style>("CardHint"),
+        });
+        DockPanel.SetDock(layoutLabel, Dock.Top);
+        layoutDock.Children.Add(layoutLabel);
+
         _controlsPanel = new StackPanel();
         DockPanel.SetDock(_controlsPanel, Dock.Bottom);
         layoutDock.Children.Add(_controlsPanel);
@@ -316,7 +277,7 @@ public sealed class MonitorsView : UserControl
             _layoutCanvas.Children.Add(new TextBlock
             {
                 Text = _backendError ?? "The wallpaper engine is unavailable on this system.",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
+                Foreground = Res<Brush>("Bad"),
                 Margin = new Thickness(4),
             });
             return;
@@ -348,7 +309,7 @@ public sealed class MonitorsView : UserControl
             _layoutCanvas!.Children.Add(new TextBlock
             {
                 Text = $"Could not read monitors: {ex.Message}",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
+                Foreground = Res<Brush>("Bad"),
             });
             return;
         }
@@ -370,7 +331,7 @@ public sealed class MonitorsView : UserControl
 
             var slotColor = m.IsPrimary
                 ? Res<Brush>("AccentMuted")
-                : new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A));
+                : Res<Brush>("Subtle");
 
             // The wallpaper is the border's Background (an ImageBrush). The brush
             // fills the rectangle (UniformToFill) and clips for free, so there is
@@ -412,7 +373,27 @@ public sealed class MonitorsView : UserControl
         // the previews so the UI reflects what will be applied.
         LoadSavedSetupIntoSlots();
 
+        // Any monitor without a saved wally assignment shows its CURRENT desktop
+        // wallpaper, so the UI reflects the live system state on first open.
+        SeedLiveWallpaperIntoEmptySlots();
+
         LayoutMonitors();
+    }
+
+    /// <summary>
+    /// Re-read connected displays AND reload the gallery folder. This is what
+    /// the header Refresh button calls: the old handler only re-read monitors,
+    /// so images newly added to the wallpaper folder never appeared until the
+    /// folder was re-picked. Reloading the gallery here picks them up.
+    /// </summary>
+    private void RefreshAll()
+    {
+        RefreshMonitors();
+
+        if (!string.IsNullOrEmpty(_config.GalleryFolder) && Directory.Exists(_config.GalleryFolder))
+        {
+            LoadGallery(_config.GalleryFolder);
+        }
     }
 
     /// <summary>
@@ -514,10 +495,9 @@ public sealed class MonitorsView : UserControl
                 OffsetY: slot.OffsetY));
         }
 
-        _config = _config.WithSetupRule(rule);
         try
         {
-            ConfigStore.Save(_config);
+            _config = ConfigStore.Update(c => c.WithSetupRule(rule));
             SetStatusAccent($"Saved this {_currentSetup.Count}-display setup — it will auto-apply when detected again.");
         }
         catch (Exception ex)
@@ -559,21 +539,70 @@ public sealed class MonitorsView : UserControl
     }
 
     /// <summary>
-    /// If the current set of monitors has a saved configuration, apply those
-    /// wallpapers to the real desktop now. Called once at startup. No-op in
-    /// simulated mode or when no rule matches.
+    /// Fill any slot that has no wally assignment with the wallpaper the monitor
+    /// is CURRENTLY displaying, read live from the backend. This makes the UI
+    /// reflect the real desktop on first open (before anything is assigned in
+    /// wally) rather than showing blank screens. No-op in simulated mode.
     /// </summary>
-    private void AutoApplySavedSetup()
+    private void SeedLiveWallpaperIntoEmptySlots()
+    {
+        if (_simulated || _backend is null)
+        {
+            return;
+        }
+
+        foreach (var slot in _slots.Values)
+        {
+            if (slot.ImagePath is not null)
+            {
+                continue; // a saved assignment already populated this slot
+            }
+
+            string? live;
+            try { live = _backend.GetMonitorWallpaper(slot.Monitor.DeviceId); }
+            catch { live = null; }
+
+            if (live is not null && File.Exists(live))
+            {
+                slot.ImagePath = live;
+                slot.RotationDegrees = 0;
+                slot.OffsetX = 0;
+                slot.OffsetY = 0;
+                RenderPreview(slot);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called on a virtual-desktop switch (and at launch). If the connected
+    /// displays match a saved setup, apply it and return true — a saved setup
+    /// takes priority over the per-desktop wallpaper. Re-reads the config from
+    /// disk so a setup saved moments ago is honoured.
+    /// </summary>
+    public bool ApplySavedSetupIfAny()
+    {
+        try { _config = ConfigStore.Load(); }
+        catch { /* keep the in-memory copy */ }
+
+        return AutoApplySavedSetup() > 0;
+    }
+
+    /// <summary>
+    /// If the current set of monitors has a saved configuration, apply those
+    /// wallpapers to the real desktop now. Returns how many displays were set.
+    /// No-op (0) in simulated mode or when no rule matches.
+    /// </summary>
+    private int AutoApplySavedSetup()
     {
         if (_simulated || _backend is null || _currentSetup is null)
         {
-            return;
+            return 0;
         }
 
         var rule = _config.RuleForSetup(_currentSetup.Fingerprint);
         if (rule is null)
         {
-            return;
+            return 0;
         }
 
         var applied = 0;
@@ -601,6 +630,8 @@ public sealed class MonitorsView : UserControl
         {
             SetStatusAccent($"Recognised this setup — auto-applied saved wallpapers to {applied} display(s).");
         }
+
+        return applied;
     }
 
     /// <summary>
@@ -645,7 +676,7 @@ public sealed class MonitorsView : UserControl
                 CornerRadius = new CornerRadius(6),
                 BorderThickness = new Thickness(2),
                 BorderBrush = Res<Brush>("CardBorder"),
-                Background = new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24)),
+                Background = Res<Brush>("Subtle"),
                 Margin = new Thickness(0, 0, 8, 0),
                 Cursor = Cursors.Hand,
                 Child = icon,
@@ -827,7 +858,7 @@ public sealed class MonitorsView : UserControl
             slot.Quality = ImageQuality.Poor;
             if (slot.BarButton is not null)
             {
-                slot.BarButton.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B));
+                slot.BarButton.BorderBrush = Res<Brush>("Bad");
                 slot.BarButton.ToolTip = $"Could not load image: {ex.Message}";
             }
         }
@@ -1055,8 +1086,8 @@ public sealed class MonitorsView : UserControl
 
         Brush ring = slot.Quality switch
         {
-            ImageQuality.Poor when slot.ImagePath is not null => new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
-            ImageQuality.Soft when slot.ImagePath is not null => new SolidColorBrush(Color.FromRgb(0xE0, 0xB8, 0x4D)),
+            ImageQuality.Poor when slot.ImagePath is not null => Res<Brush>("Bad"),
+            ImageQuality.Soft when slot.ImagePath is not null => Res<Brush>("Warn"),
             _ => Res<Brush>("CardBorder"),
         };
 
@@ -1064,12 +1095,12 @@ public sealed class MonitorsView : UserControl
         if (slot.Selected)
         {
             slot.BarButton.BorderBrush = Res<Brush>("Accent");
-            slot.BarButton.Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30));
+            slot.BarButton.Background = Res<Brush>("SubtleHover");
         }
         else
         {
             slot.BarButton.BorderBrush = ring;
-            slot.BarButton.Background = new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24));
+            slot.BarButton.Background = Res<Brush>("Subtle");
         }
 
         if (slot.BarButton.Child is TextBlock icon)
@@ -1103,7 +1134,7 @@ public sealed class MonitorsView : UserControl
         if (_statusLabel is not null)
         {
             _statusLabel.Text = text;
-            _statusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B));
+            _statusLabel.Foreground = Res<Brush>("Bad");
         }
     }
 
@@ -1172,7 +1203,7 @@ public sealed class MonitorsView : UserControl
             else
             {
                 _statusLabel.Text = $"Applied {applied}, failed {failures.Count}: {string.Join("; ", failures)}";
-                _statusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B));
+                _statusLabel.Foreground = Res<Brush>("Bad");
             }
         }
     }
@@ -1297,10 +1328,8 @@ public sealed class MonitorsView : UserControl
         headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var galleryTitle = new TextBlock
         {
-            Text = "Gallery",
-            Foreground = Res<Brush>("TextSecondary"),
-            FontWeight = FontWeights.SemiBold,
-            FontSize = 13,
+            Text = "GALLERY",
+            Style = Res<Style>("CardLabel"),
             VerticalAlignment = VerticalAlignment.Center,
         };
         Grid.SetColumn(galleryTitle, 0);
@@ -1365,8 +1394,8 @@ public sealed class MonitorsView : UserControl
         // Persist the choice so it reloads on next launch.
         try
         {
-            _config = _config with { GalleryFolder = dlg.FolderName };
-            ConfigStore.Save(_config);
+            var folder = dlg.FolderName;
+            _config = ConfigStore.Update(c => c with { GalleryFolder = folder });
         }
         catch
         {
@@ -1390,7 +1419,7 @@ public sealed class MonitorsView : UserControl
             _galleryPanel.Children.Add(new TextBlock
             {
                 Text = $"Could not read folder: {ex.Message}",
-                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)),
+                Foreground = Res<Brush>("Bad"),
                 FontSize = 12,
             });
             return;
@@ -1440,7 +1469,7 @@ public sealed class MonitorsView : UserControl
             BorderThickness = new Thickness(1),
             ClipToBounds = true,
             Cursor = Cursors.Hand,
-            Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+            Background = Res<Brush>("Subtle"),
             Child = img,
             ToolTip = Path.GetFileName(path),
             VerticalAlignment = VerticalAlignment.Stretch,
@@ -1480,6 +1509,19 @@ public sealed class MonitorsView : UserControl
     }
 
     // --- helpers -----------------------------------------------------------
+
+    /// <summary>
+    /// Picky/Study icon-only toolbar button: the shared ToolIconButton style
+    /// (38×34, subtle surface) with a Unicode symbol glyph; the tooltip carries
+    /// the label.
+    /// </summary>
+    private Button IconButton(string glyph, string tooltip) => new()
+    {
+        Style = Res<Style>("ToolIconButton"),
+        VerticalAlignment = VerticalAlignment.Center,
+        ToolTip = tooltip,
+        Content = GlyphIcon.Create(glyph),
+    };
 
     private T Res<T>(string key) => (T)FindResource(key);
 }

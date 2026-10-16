@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,9 +20,6 @@ namespace Wally.App;
 /// </summary>
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
-    private const double NavCollapsedWidth = 60;
-    private const double NavExpandedWidth = 220;
-
     private readonly DesktopWallpaperBackend? _backend;
     private readonly string? _backendError;
     private readonly bool _simulate;
@@ -55,7 +52,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MainWindow(DesktopWallpaperBackend? backend, string? backendError, bool simulate = false, VirtualDesktopService? vds = null)
     {
         InitializeComponent();
+        DwmHelper.ApplyPowerToysChrome(this);
         Title = AppInfo.NameWithVersion;
+        TaglineText.Text = $"Per-monitor and per-desktop wallpapers · v{AppInfo.Version}";
         Icon = BrandMark.ToImageSource(32);
         DataContext = this;
         _backend = backend;
@@ -67,17 +66,101 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // Once the native window handle exists, track it (fallback for desktop
         // resolution) and begin watching for virtual-desktop switches.
         SourceInitialized += OnSourceInitialized;
+        StateChanged += (_, _) => UpdateMaximizeGlyph();
+        Loaded += (_, _) => UpdateMaximizeGlyph();
+        AccentTheme.Changed += OnAccentChanged;
         Closed += (_, _) =>
         {
+            AccentTheme.Changed -= OnAccentChanged;
             _desktopWatcher?.Dispose();
             _smallIcon?.Dispose();
             _largeIcon?.Dispose();
         };
     }
 
+    // Keep the caption-strip maximize button's glyph and tooltip in sync with
+    // the window state: a "maximize" square when normal, a "restore" overlap
+    // when maximized. The glyph lives inside the button's ControlTemplate, so
+    // it is reached via the template once the button is loaded.
+    private void UpdateMaximizeGlyph()
+    {
+        if (MaximizeButton is null)
+        {
+            return;
+        }
+
+        var maximized = WindowState == WindowState.Maximized;
+        MaximizeButton.Content = maximized ? "❐" : "□";
+        MaximizeButton.ToolTip = maximized ? "Restore" : "Maximize";
+    }
+
     // Custom caption-strip controls (the OS titlebar is removed via WindowChrome).
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
+
+    // Toggle maximize/restore from the caption-strip button.
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+
+    // Dragging the caption strip moves the window; a double-click toggles
+    // maximize/restore, matching a normal titlebar. With WindowChrome's
+    // CaptionHeight=0 the strip provides the move region itself.
+    private void CaptionStrip_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            return;
+        }
+
+        if (e.ButtonState != System.Windows.Input.MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        // Dragging a maximized window restores it and continues the move under
+        // the cursor, like a normal titlebar. All math stays in device-
+        // independent units (DIPs): mixing PointToScreen's physical pixels with
+        // Left/Top/RestoreBounds (DIPs) on a scaled display puts the window off
+        // under the cursor, which is why the grab point fell outside the frame.
+        if (WindowState == WindowState.Maximized)
+        {
+            var cursorInWindow = e.GetPosition(this);          // DIPs, from window top-left
+            double ratioX = ActualWidth > 0 ? cursorInWindow.X / ActualWidth : 0.5;
+
+            double restoredWidth = RestoreBounds.Width;
+            if (double.IsNaN(restoredWidth) || restoredWidth <= 0)
+            {
+                restoredWidth = Width; // fallback to the configured width
+            }
+
+            // Cursor position on the virtual desktop in DIPs. PointToScreen gives
+            // PHYSICAL pixels; divide by the per-monitor DPI scale to get DIPs so
+            // the restored Left/Top (which are DIPs) line up under the cursor on
+            // a scaled display. Doing this wrong is what pushed the grab point
+            // outside the restored frame.
+            var src = System.Windows.PresentationSource.FromVisual(this);
+            double scaleX = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double scaleY = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+
+            var cursorPhysical = PointToScreen(cursorInWindow);
+            double cursorScreenX = cursorPhysical.X / scaleX;
+            double cursorScreenY = cursorPhysical.Y / scaleY;
+
+            WindowState = WindowState.Normal;
+
+            // Place the restored window so the cursor keeps the same proportional
+            // X on the (now narrower) title bar, and sits ~15 DIP below the top.
+            Left = cursorScreenX - restoredWidth * ratioX;
+            Top = cursorScreenY - 15;
+        }
+
+        DragMove();
+    }
 
     // Close hides to the tray (the tray's Closing handler cancels the real exit);
     // the app only truly quits from the tray menu's Quit.
@@ -102,6 +185,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _desktopWatcher = new DesktopWatcher(_vds);
         _desktopWatcher.DesktopChanged += OnDesktopChanged;
         _desktopWatcher.Start();
+
+        // Apply the current desktop's assigned wallpaper immediately on launch,
+        // so the correct wallpaper is shown without waiting for the first switch.
+        // The watcher seeds its guid silently (no startup "change" event), so we
+        // drive the initial apply explicitly here.
+        var current = _vds.CurrentDesktopGuid();
+        if (!string.IsNullOrEmpty(current))
+        {
+            OnDesktopChanged(current);
+        }
     }
 
     private const int WM_SETICON = 0x0080;
@@ -120,11 +213,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         // Separate HICONs sized for the small (titlebar/taskbar) and large
         // (Alt-Tab) slots so each is crisp rather than a scaled 32px bitmap.
-        // Held as fields so the GDI handles live as long as the window uses them.
+        // Held as fields so the GDI handles live as long as the window uses them;
+        // the previous pair is released after the new one is in place.
+        var oldSmall = _smallIcon;
+        var oldLarge = _largeIcon;
         _smallIcon = BrandMark.ToIcon(16);
         _largeIcon = BrandMark.ToIcon(32);
         SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_SMALL, _smallIcon.Handle);
         SendMessage(hwnd, WM_SETICON, (IntPtr)ICON_BIG, _largeIcon.Handle);
+        oldSmall?.Dispose();
+        oldLarge?.Dispose();
+    }
+
+    // Redraw the taskbar / Alt-Tab icon in the new accent colour (Study does the same).
+    private void OnAccentChanged()
+    {
+        Icon = BrandMark.ToImageSource(32);
+        SetWindowIconNative(new System.Windows.Interop.WindowInteropHelper(this).Handle);
     }
 
     private void OnDesktopChanged(string guid)
@@ -132,23 +237,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         // Ensure the view exists so the swap is applied even if the user hasn't
         // opened the Desktops page yet (auto-apply must work in the background).
         EnsureDesktopsView();
-        _desktopsView!.OnDesktopChanged(guid);
-    }
 
-    private void NavToggle_Click(object sender, RoutedEventArgs e)
-    {
-        NavExpanded = !NavExpanded;
-        var to = NavExpanded ? NavExpandedWidth : NavCollapsedWidth;
-        var anim = new GridLengthAnimation
-        {
-            From = new GridLength(NavColumn.ActualWidth),
-            To = new GridLength(to),
-            Duration = new Duration(TimeSpan.FromMilliseconds(160)),
-        };
-        NavColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
+        // Priority: a saved monitor setup matching the connected displays beats
+        // the per-desktop wallpaper. Previously the desktop wallpaper was applied
+        // after the setup and overwrote it.
+        var setupApplied = _monitorsView?.ApplySavedSetupIfAny() ?? false;
+        _desktopsView!.OnDesktopChanged(guid, applyWallpaper: !setupApplied);
     }
 
     private void NavMonitors_Checked(object sender, RoutedEventArgs e) => ShowMonitors();
+
+    // Swap the page into the content host and publish its title + header
+    // actions to the shell header.
+    private void ShowPage(FrameworkElement page)
+    {
+        ContentHost.Content = page;
+        if (page is IShellPage shellPage)
+        {
+            PageTitleText.Text = shellPage.PageTitle;
+            PageActionsHost.Content = shellPage.HeaderActions;
+        }
+        else
+        {
+            PageTitleText.Text = string.Empty;
+            PageActionsHost.Content = null;
+        }
+    }
 
     private void NavDesktops_Checked(object sender, RoutedEventArgs e) => ShowDesktops();
 
@@ -160,7 +274,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         EnsureDesktopsView();
-        ContentHost.Content = _desktopsView;
+        ShowPage(_desktopsView!);
     }
 
     private void EnsureDesktopsView()
@@ -168,11 +282,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _desktopsView ??= new DesktopsView(_backend, _vds, _simulate);
     }
 
-    private void NavSettings_Checked(object sender, RoutedEventArgs e) =>
-        ShowPlaceholder(
-            "Settings",
-            "Startup behaviour, new-desktop rules, and the image rotation pool.",
-            "Coming next: start-on-login, the new-desktop behaviour toggle (open the manager vs auto-assign), and the rotation pool editor.");
+    private void NavSettings_Checked(object sender, RoutedEventArgs e) => ShowSettings();
+
+    private SettingsView? _settingsView;
+
+    private void ShowSettings()
+    {
+        if (ContentHost is null)
+        {
+            return;
+        }
+
+        _settingsView ??= new SettingsView();
+        ShowPage(_settingsView!);
+    }
 
     private void ShowMonitors()
     {
@@ -186,30 +309,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _backend,
             _backendError,
             _simulate ? FakeMonitorProvider.TwoPlusDisplays() : null);
-        ContentHost.Content = _monitorsView;
-    }
-
-    private void ShowPlaceholder(string title, string subtitle, string body)
-    {
-        if (ContentHost is null)
-        {
-            return;
-        }
-
-        var root = new StackPanel();
-        root.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("PageTitle") });
-        root.Children.Add(new TextBlock { Text = subtitle, Style = (Style)FindResource("PageSubtitle") });
-
-        var card = new Border { Style = (Style)FindResource("Card") };
-        card.Child = new TextBlock
-        {
-            Text = body,
-            Foreground = (Brush)FindResource("TextSecondary"),
-            FontSize = 13,
-            TextWrapping = TextWrapping.Wrap,
-            LineHeight = 20,
-        };
-        root.Children.Add(card);
-        ContentHost.Content = root;
+        ShowPage(_monitorsView!);
     }
 }

@@ -6,79 +6,103 @@ using Point = System.Drawing.Point;
 namespace Wally.App;
 
 /// <summary>
-/// The wally brand mark — a white rounded tile with a dark monitor showing a
-/// sun-over-hill wallpaper motif. Drawn with GDI+ at runtime so there is a
-/// single source of truth for the tray icon, the window/taskbar icon, and the
-/// generated .ico, with no external asset to keep in sync.
+/// The wally brand mark — an accent rounded square (same geometry as the
+/// sibling "Study" and "Picky" taskbar icons: 4.5% inset, 22% corner radius)
+/// with wally's monitor-showing-a-wallpaper glyph on top. Drawn with GDI+ at
+/// runtime so there is a single source of truth for the tray icon, the
+/// window/taskbar icon, and the generated .ico, with no external asset to keep
+/// in sync.
 /// </summary>
 public static class BrandMark
 {
+    // Match Study/Picky exactly so the icons sit together on the taskbar.
+    private const float PadFraction = 0.045f;   // inset per side
+    private const float RadiusFraction = 0.22f; // corner radius
+
+    // Tile = the live accent colour, glyph = its readable foreground, exactly
+    // like Study's AppIcon (which draws its square in the chosen accent). So the
+    // taskbar, Alt-Tab and tray icons follow Settings → Accent colour.
+    private static Color Accent => ToDrawing(AccentTheme.Current);
+    private static Color Glyph => ToDrawing(AccentTheme.OnAccent);
+
+    private static Color ToDrawing(System.Windows.Media.Color c) => Color.FromArgb(c.A, c.R, c.G, c.B);
+
     /// <summary>Render the brand mark into a square bitmap of the given size.</summary>
     public static Bitmap Render(int size)
     {
-        var bmp = new Bitmap(size, size);
+        var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(bmp);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
-        // Scale the 32px reference design to the requested size.
-        float s = size / 32f;
-        float Sx(float v) => v * s;
+        float s = size;
+        float pad = Math.Max(0.5f, s * PadFraction);
+        float radius = s * RadiusFraction;
 
-        // White rounded tile (near full-bleed; small margin for the rounding).
-        using var tile = new GraphicsPath();
-        float r = Sx(6);
-        var rect = new RectangleF(Sx(0.5f), Sx(0.5f), size - Sx(1), size - Sx(1));
-        tile.AddArc(rect.X, rect.Y, r * 2, r * 2, 180, 90);
-        tile.AddArc(rect.Right - r * 2, rect.Y, r * 2, r * 2, 270, 90);
-        tile.AddArc(rect.Right - r * 2, rect.Bottom - r * 2, r * 2, r * 2, 0, 90);
-        tile.AddArc(rect.X, rect.Bottom - r * 2, r * 2, r * 2, 90, 90);
-        tile.CloseFigure();
-        g.FillPath(Brushes.White, tile);
-
-        // Monitor as a FILLED dark rounded body with a light inset screen, so
-        // it reads clearly at taskbar sizes (a thin-stroke rectangle collapses
-        // when scaled down). Reference box is 32px. The whole mark — body +
-        // stand — is vertically balanced so it sits centred in the tile.
-        var dark = Color.FromArgb(0x20, 0x20, 0x20);
-        using var darkBrush = new SolidBrush(dark);
-
-        // Monitor body (filled, slightly rounded).
-        var body = new RectangleF(Sx(6), Sx(6.5f), Sx(20), Sx(14));
-        using (var bodyPath = RoundedRect(body, Sx(2)))
+        // Accent rounded square filling the slot — identical footprint and
+        // corner radius to Study, so wally reads as the same size next to it.
+        var tile = new RectangleF(pad, pad, s - 2 * pad, s - 2 * pad);
+        using (var tilePath = RoundedRect(tile, radius))
+        using (var bg = new SolidBrush(Accent))
         {
-            g.FillPath(darkBrush, bodyPath);
+            g.FillPath(bg, tilePath);
         }
 
-        // Light inset screen showing the sun + hill wallpaper motif.
-        var screen = new RectangleF(body.X + Sx(2), body.Y + Sx(2), body.Width - Sx(4), body.Height - Sx(4));
-        g.FillRectangle(Brushes.White, screen);
+        // wally's monitor glyph, laid out as fractions of the tile's inner box
+        // so it scales cleanly at every icon size and stays centred.
+        float ox = tile.X, oy = tile.Y, tw = tile.Width, th = tile.Height;
+        float Fx(float f) => ox + tw * f;
+        float Fy(float f) => oy + th * f;
+
+        using var glyphBrush = new SolidBrush(Glyph);
+
+        // Monitor body — a rounded rectangle, horizontally centred, upper-ish
+        // so the stand fits below. Spans ~56% wide, ~40% tall of the tile.
+        var body = RectangleF.FromLTRB(Fx(0.22f), Fy(0.26f), Fx(0.78f), Fy(0.64f));
+        using (var bodyPath = RoundedRect(body, tw * 0.06f))
+        {
+            g.FillPath(glyphBrush, bodyPath);
+        }
+
+        // Screen cut-out showing the sun + hill wallpaper motif, painted in the
+        // accent colour so the motif is the tile colour showing "through".
+        var screen = new RectangleF(
+            body.X + tw * 0.045f, body.Y + th * 0.045f,
+            body.Width - tw * 0.09f, body.Height - th * 0.09f);
+        using (var accentBrush = new SolidBrush(Accent))
+        {
+            g.FillRectangle(accentBrush, screen);
+        }
 
         var oldClip = g.Clip;
         g.SetClip(screen);
-        // Sun.
-        g.FillEllipse(darkBrush, screen.X + Sx(2), screen.Y + Sx(1.5f), Sx(4), Sx(4));
-        // Hill.
+        // Sun (light).
+        g.FillEllipse(glyphBrush,
+            screen.X + screen.Width * 0.10f, screen.Y + screen.Height * 0.12f,
+            screen.Width * 0.28f, screen.Width * 0.28f);
+        // Hill (light).
         using (var hill = new GraphicsPath())
         {
             hill.AddPolygon(new[]
             {
                 new PointF(screen.X, screen.Bottom),
-                new PointF(screen.X + Sx(5.5f), screen.Y + Sx(5)),
-                new PointF(screen.X + Sx(10), screen.Y + Sx(7.5f)),
-                new PointF(screen.Right, screen.Y + Sx(4)),
+                new PointF(screen.X + screen.Width * 0.33f, screen.Y + screen.Height * 0.45f),
+                new PointF(screen.X + screen.Width * 0.60f, screen.Y + screen.Height * 0.68f),
+                new PointF(screen.Right, screen.Y + screen.Height * 0.35f),
                 new PointF(screen.Right, screen.Bottom),
             });
-            g.FillPath(darkBrush, hill);
+            g.FillPath(glyphBrush, hill);
         }
         g.Clip = oldClip;
 
         // Neck + base stand, centred under the body.
         float cx = body.X + body.Width / 2f;
-        g.FillRectangle(darkBrush, cx - Sx(1.25f), body.Bottom, Sx(2.5f), Sx(2.5f));
-        using (var basePath = RoundedRect(new RectangleF(cx - Sx(5), body.Bottom + Sx(2.5f), Sx(10), Sx(2.25f)), Sx(1)))
+        g.FillRectangle(glyphBrush, cx - tw * 0.04f, body.Bottom, tw * 0.08f, th * 0.07f);
+        using (var basePath = RoundedRect(
+            new RectangleF(cx - tw * 0.16f, body.Bottom + th * 0.07f, tw * 0.32f, th * 0.06f),
+            tw * 0.03f))
         {
-            g.FillPath(darkBrush, basePath);
+            g.FillPath(glyphBrush, basePath);
         }
 
         return bmp;

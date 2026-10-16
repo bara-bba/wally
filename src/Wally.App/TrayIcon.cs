@@ -38,8 +38,23 @@ public sealed class TrayIcon : IDisposable
 
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
 
+        // Redraw the tray icon in the new accent colour when it changes.
+        AccentTheme.Changed += OnAccentChanged;
+
         // Intercept the window close: hide to tray instead of exiting.
         _window.Closing += OnWindowClosing;
+    }
+
+    private void OnAccentChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var old = _notifyIcon.Icon;
+        _notifyIcon.Icon = BrandMark.ToIcon(32);
+        old?.Dispose();
     }
 
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -78,6 +93,7 @@ public sealed class TrayIcon : IDisposable
         }
 
         _window.Closing -= OnWindowClosing;
+        AccentTheme.Changed -= OnAccentChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _disposed = true;
