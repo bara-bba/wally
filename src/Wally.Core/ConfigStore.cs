@@ -54,13 +54,27 @@ public static class ConfigStore
             var perMonitor = new JsonArray();
             foreach (var m in r.PerMonitor)
             {
-                perMonitor.Add(new JsonObject
+                var mObj = new JsonObject
                 {
                     ["edid_key"] = m.EdidKey,
                     ["image_path"] = m.ImagePath,
                     ["fit"] = FitName(m.Fit),
                     ["rotation_degrees"] = m.RotationDegrees,
-                });
+                };
+
+                // Only persist a pan offset when it is actually set, so existing
+                // configs stay clean and the field is purely additive.
+                if (m.OffsetX != 0)
+                {
+                    mObj["offset_x"] = m.OffsetX;
+                }
+
+                if (m.OffsetY != 0)
+                {
+                    mObj["offset_y"] = m.OffsetY;
+                }
+
+                perMonitor.Add(mObj);
             }
 
             setupRules.Add(new JsonObject
@@ -75,12 +89,18 @@ public static class ConfigStore
         var assignments = new JsonArray();
         foreach (var a in config.DesktopAssignments)
         {
-            assignments.Add(new JsonObject
+            var aObj = new JsonObject
             {
                 ["desktop_guid"] = a.DesktopGuid,
                 ["image_path"] = a.ImagePath,
                 ["fit"] = FitName(a.Fit),
-            });
+            };
+            if (a.RotationDegrees != 0)
+            {
+                aObj["rotation_degrees"] = a.RotationDegrees;
+            }
+
+            assignments.Add(aObj);
         }
 
         var rotation = new JsonArray();
@@ -94,6 +114,7 @@ public static class ConfigStore
             ["schema"] = SchemaVersion,
             ["new_desktop_behavior"] = config.NewDesktopBehavior,
             ["gallery_folder"] = config.GalleryFolder,
+            ["accent_color"] = config.AccentColor,
             ["rotation_pool"] = rotation,
             ["setup_rules"] = setupRules,
             ["desktop_assignments"] = assignments,
@@ -130,7 +151,9 @@ public static class ConfigStore
                             EdidKey: m["edid_key"]!.GetValue<string>(),
                             ImagePath: m["image_path"]!.GetValue<string>(),
                             Fit: ParseFit(m["fit"]?.GetValue<string>() ?? "fill"),
-                            RotationDegrees: m["rotation_degrees"]?.GetValue<int?>() ?? 0));
+                            RotationDegrees: m["rotation_degrees"]?.GetValue<int?>() ?? 0,
+                            OffsetX: m["offset_x"]?.GetValue<double?>() ?? 0,
+                            OffsetY: m["offset_y"]?.GetValue<double?>() ?? 0));
                     }
                 }
 
@@ -151,7 +174,8 @@ public static class ConfigStore
                 assignments.Add(new DesktopAssignment(
                     DesktopGuid: a["desktop_guid"]!.GetValue<string>(),
                     ImagePath: a["image_path"]!.GetValue<string>(),
-                    Fit: ParseFit(a["fit"]?.GetValue<string>() ?? "fill")));
+                    Fit: ParseFit(a["fit"]?.GetValue<string>() ?? "fill"),
+                    RotationDegrees: a["rotation_degrees"]?.GetValue<int?>() ?? 0));
             }
         }
 
@@ -171,6 +195,7 @@ public static class ConfigStore
             RotationPool: rotation)
         {
             GalleryFolder = data["gallery_folder"]?.GetValue<string>(),
+            AccentColor = data["accent_color"]?.GetValue<string>(),
         };
     }
 
@@ -202,6 +227,25 @@ public static class ConfigStore
         {
             throw new FormatException($"Corrupt or invalid wally config at {path}: {exc.Message}", exc);
         }
+    }
+
+    /// <summary>
+    /// Read-modify-write: load the LATEST config from disk, apply
+    /// <paramref name="change"/>, save, and return the result. Each view keeps
+    /// its own in-memory copy; saving that copy directly would overwrite fields
+    /// another view changed since (e.g. the accent colour set in Settings being
+    /// wiped by the Monitors view saving its gallery folder). Always save through
+    /// this so changes compose.
+    /// </summary>
+    public static WallyConfig Update(Func<WallyConfig, WallyConfig> change, string? path = null)
+    {
+        WallyConfig latest;
+        try { latest = Load(path); }
+        catch (FormatException) { latest = new WallyConfig(); }
+
+        var updated = change(latest);
+        Save(updated, path);
+        return updated;
     }
 
     public static string Save(WallyConfig config, string? path = null)

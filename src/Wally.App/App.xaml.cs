@@ -21,6 +21,25 @@ public partial class App : Application
         // Do not quit when the last window hides; the tray owns the lifetime.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        // Apply the saved accent colour before the first window paints, so the
+        // UI starts in the user's chosen colour rather than flashing the default.
+        try
+        {
+            var cfg = Wally.Core.ConfigStore.Load();
+            if (AccentTheme.TryParse(cfg.AccentColor, out var accent))
+            {
+                AccentTheme.Apply(accent);
+            }
+            else
+            {
+                AccentTheme.Apply(AccentTheme.Default);
+            }
+        }
+        catch
+        {
+            AccentTheme.Apply(AccentTheme.Default);
+        }
+
         DesktopWallpaperBackend? backend = null;
         string? backendError = null;
         try
@@ -32,7 +51,19 @@ public partial class App : Application
             backendError = ex.Message;
         }
 
-        var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"));
+        // Virtual-desktop service is best-effort: if the documented COM class is
+        // unavailable, the Desktops view degrades to an informational message.
+        VirtualDesktopService? vds = null;
+        try
+        {
+            vds = new VirtualDesktopService();
+        }
+        catch
+        {
+            vds = null;
+        }
+
+        var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"), vds);
         _tray = new TrayIcon(window);
         window.Show();
     }

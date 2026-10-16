@@ -98,6 +98,23 @@ public sealed class DesktopWallpaperBackend : IMonitorProvider, IWallpaperBacken
         _dw.SetWallpaper(deviceId, imagePath);
     }
 
+    /// <summary>
+    /// The wallpaper currently applied to a monitor, or null if none/unknown.
+    /// Lets the UI show the live desktop state before any wally assignment.
+    /// </summary>
+    public string? GetMonitorWallpaper(string deviceId)
+    {
+        try
+        {
+            var path = _dw.GetWallpaper(deviceId);
+            return string.IsNullOrEmpty(path) ? null : path;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)

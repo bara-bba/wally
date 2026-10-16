@@ -77,11 +77,20 @@ public sealed partial record MonitorSetup(IReadOnlyList<Monitor> Monitors)
 }
 
 /// <summary>Which wallpaper + fit to apply to one monitor within a setup.</summary>
+/// <remarks>
+/// <see cref="OffsetX"/>/<see cref="OffsetY"/> pan the image within the screen
+/// when it is cropped to fill (aspect ratios differ). They are NORMALISED to the
+/// range [-1, 1]: 0 is centred, -1/+1 push the crop fully to one edge, and the
+/// value is independent of preview or screen pixel size. Only the axis with
+/// spare image (the one being cropped) has any visible effect.
+/// </remarks>
 public sealed record MonitorRule(
     string EdidKey,
     string ImagePath,
     WallpaperFit Fit = WallpaperFit.Fill,
-    int RotationDegrees = 0);
+    int RotationDegrees = 0,
+    double OffsetX = 0,
+    double OffsetY = 0);
 
 /// <summary>
 /// A complete rule for one monitor setup: a wallpaper per monitor.
@@ -140,7 +149,8 @@ public sealed partial record SetupRule(
 public sealed record DesktopAssignment(
     string DesktopGuid,
     string ImagePath,
-    WallpaperFit Fit = WallpaperFit.Fill);
+    WallpaperFit Fit = WallpaperFit.Fill,
+    int RotationDegrees = 0);
 
 /// <summary>Top-level persisted state.</summary>
 public sealed partial record WallyConfig(
@@ -158,6 +168,9 @@ public sealed partial record WallyConfig(
 
     /// <summary>Last chosen wallpapers folder for the gallery, reloaded on startup.</summary>
     public string? GalleryFolder { get; init; }
+
+    /// <summary>User-selected accent colour as "#RRGGBB". Null = app default.</summary>
+    public string? AccentColor { get; init; }
 
     public SetupRule? RuleForSetup(string fingerprint)
     {

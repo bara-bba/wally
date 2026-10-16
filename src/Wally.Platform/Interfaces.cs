@@ -12,6 +12,9 @@ public interface IMonitorProvider
 public interface IWallpaperBackend
 {
     void SetMonitorWallpaper(string deviceId, string imagePath, WallpaperFit fit);
+
+    /// <summary>The wallpaper currently applied to a monitor, or null if none.</summary>
+    string? GetMonitorWallpaper(string deviceId);
 }
 
 /// <summary>Reads virtual-desktop state. Backed by build-pinned COM on Windows.</summary>

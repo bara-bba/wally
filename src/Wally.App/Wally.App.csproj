@@ -12,7 +12,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>Wally</AssemblyName>
+    <AssemblyName>wally</AssemblyName>
+
+    <!-- Taskbar / Explorer / Alt-Tab icon (baked into the exe). The window and
+         tray icons are drawn from the same brand mark at runtime (BrandMark). -->
+    <ApplicationIcon>wally.ico</ApplicationIcon>
+
+    <!-- Version applies to every build (Debug and Release) so the running app
+         can always read it. This is the DEFAULT; a build can override it with
+         `-p:Version=x.y.z` (build-dist.ps1 -Version does exactly that), and an
+         explicit MSBuild property always wins over this file value. -->
+    <Version>0.1.0</Version>
+    <Company>wally</Company>
+    <Product>wally</Product>
+    <AssemblyTitle>wally</AssemblyTitle>
   </PropertyGroup>
 
   <!-- Distribution: self-contained single-file exe. Users need nothing
@@ -25,10 +38,6 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
-    <Version>0.1.0</Version>
-    <Company>wally</Company>
-    <Product>wally</Product>
-    <AssemblyTitle>wally</AssemblyTitle>
   </PropertyGroup>
 
 </Project>

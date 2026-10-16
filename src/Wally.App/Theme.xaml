@@ -3,18 +3,18 @@
 
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 
-    <!-- Picky-inspired near-black, flat, monochrome palette  -->
-    <Color x:Key="AppBackgroundColor">#191919</Color>
-    <Color x:Key="NavBackgroundColor">#1E1E1E</Color>
-    <Color x:Key="CardBackgroundColor">#232323</Color>
-    <Color x:Key="CardHoverColor">#2A2A2A</Color>
-    <Color x:Key="CardBorderColor">#2E2E2E</Color>
-    <Color x:Key="AccentColor">#FFFFFF</Color>
-    <Color x:Key="AccentMutedColor">#3A3A3A</Color>
-    <Color x:Key="TextPrimaryColor">#F2F2F2</Color>
-    <Color x:Key="TextSecondaryColor">#B8B8B8</Color>
-    <Color x:Key="TextTertiaryColor">#7E7E7E</Color>
-    <Color x:Key="NavSelectedColor">#2A2A2A</Color>
+    <!-- Shared Picky / Study PowerToys-Fluent dark palette (same values) -->
+    <Color x:Key="AppBackgroundColor">#202020</Color>
+    <Color x:Key="NavBackgroundColor">#202020</Color>
+    <Color x:Key="CardBackgroundColor">#2B2B2B</Color>
+    <Color x:Key="CardHoverColor">#323232</Color>
+    <Color x:Key="CardBorderColor">#383838</Color>
+    <Color x:Key="AccentColor">#0078D4</Color>
+    <Color x:Key="AccentMutedColor">#333333</Color>
+    <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
+    <Color x:Key="TextSecondaryColor">#ADADAD</Color>
+    <Color x:Key="TextTertiaryColor">#8A8A8A</Color>
+    <Color x:Key="NavSelectedColor">#323232</Color>
 
     <SolidColorBrush x:Key="AppBackground" Color="{StaticResource AppBackgroundColor}" />
     <SolidColorBrush x:Key="NavBackground" Color="{StaticResource NavBackgroundColor}" />
@@ -23,12 +23,27 @@
     <SolidColorBrush x:Key="CardBorder" Color="{StaticResource CardBorderColor}" />
     <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}" />
     <SolidColorBrush x:Key="AccentMuted" Color="{StaticResource AccentMutedColor}" />
+    <!-- Accent-derived brushes, swapped live by AccentTheme.Apply. Seeded here
+         so XAML that references them resolves before the first Apply call. -->
+    <SolidColorBrush x:Key="AccentHover" Color="#1683D8" />
+    <SolidColorBrush x:Key="AccentPressed" Color="#0067B8" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+    <!-- Error / warning text, same as Study's Brush.Bad / Brush.Warn. -->
+    <SolidColorBrush x:Key="Bad" Color="#FF6B6B" />
+    <SolidColorBrush x:Key="Warn" Color="#FCE100" />
+    <!-- Picky / Study subtle button surfaces -->
+    <SolidColorBrush x:Key="Subtle" Color="#333333" />
+    <SolidColorBrush x:Key="SubtleHover" Color="#3D3D3D" />
+    <SolidColorBrush x:Key="SubtlePressed" Color="#2E2E2E" />
+    <SolidColorBrush x:Key="StrokeSubtle" Color="#26FFFFFF" />
+    <!-- Symbol font for the Unicode toolbar glyphs Picky and Study use (⟳ ⚙ ✎ ⧉). -->
+    <FontFamily x:Key="SymbolFont">Segoe UI Symbol, Segoe UI</FontFamily>
     <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource TextPrimaryColor}" />
     <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="TextTertiary" Color="{StaticResource TextTertiaryColor}" />
     <SolidColorBrush x:Key="NavSelected" Color="{StaticResource NavSelectedColor}" />
 
-    <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="AppFont">Segoe UI Variable, Segoe UI</FontFamily>
 
     <!-- Page title (large light weight, PowerToys header style)  -->
     <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -54,12 +69,29 @@
         <Setter Property="Margin" Value="2,8,0,8" />
     </Style>
 
+    <!-- Clony-style card label: small uppercase caption at the top of a card. -->
+    <Style x:Key="CardLabel" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="CardHint" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource TextTertiary}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
     <!-- Settings-style card (rounded, bordered surface)  -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBackground}" />
         <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="16" />
         <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
@@ -69,10 +101,13 @@
         <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <!-- Collapsed rail: a true 44x44 square, left-aligned on the same
+             8px axis as the logo toggle. Expanded: the row stretches for labels. -->
         <Setter Property="Height" Value="44" />
-        <Setter Property="Margin" Value="8,2,8,2" />
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Margin" Value="8,2,0,2" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Template">
             <Setter.Value>
@@ -80,20 +115,21 @@
                     <Border x:Name="Bg" CornerRadius="6" Background="Transparent">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="44" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
+                            <!-- Pill overlays the square's left edge so it never
+                                 pushes the icon off-centre. -->
                             <Rectangle x:Name="Pill" Grid.Column="0"
-                                       Width="3" Height="20" RadiusX="2" RadiusY="2"
-                                       Fill="{StaticResource Accent}" Opacity="0"
+                                       Width="3" Height="18" RadiusX="1.5" RadiusY="1.5"
+                                       Fill="{DynamicResource Accent}" Opacity="0"
                                        HorizontalAlignment="Left" VerticalAlignment="Center" />
-                            <TextBlock x:Name="Icon" Grid.Column="1"
+                            <TextBlock x:Name="Icon" Grid.Column="0"
                                        Text="{TemplateBinding Tag}"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                        FontSize="17"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock x:Name="Label" Grid.Column="2" Text="{TemplateBinding Content}"
+                            <TextBlock x:Name="Label" Grid.Column="1" Text="{TemplateBinding Content}"
                                        VerticalAlignment="Center" Margin="4,0,12,0"
                                        Visibility="{Binding NavExpanded, RelativeSource={RelativeSource AncestorType=Window},
                                                     Converter={StaticResource BoolToVisibility}}" />
@@ -112,31 +148,45 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding NavExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                <Setter Property="Width" Value="NaN" />
+                <Setter Property="Margin" Value="8,2,8,2" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
-    <!-- Primary action button: quiet light fill, dark text (Picky-flat)  -->
+    <!-- ===== Button system shared with Picky / Study ===== -->
+
+    <!-- Accent (primary) button: live accent fill, SemiBold, 4px corners. -->
     <Style x:Key="AccentButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="#1A1A1A" />
-        <Setter Property="Background" Value="#E6E6E6" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Height" Value="34" />
-        <Setter Property="Padding" Value="16,0,16,0" />
+        <Setter Property="Padding" Value="14,0,14,0" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="6"
-                            Padding="{TemplateBinding Padding}">
+                    <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="4"
+                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bg" Property="Background" Value="#FFFFFF" />
+                            <Setter TargetName="Bg" Property="Background" Value="{DynamicResource AccentHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{DynamicResource AccentPressed}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource AccentMuted}" />
+                            <Setter TargetName="Bg" Property="Opacity" Value="0.5" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -144,29 +194,105 @@
         </Setter>
     </Style>
 
-    <!-- Secondary (subtle) button — Picky flat dark  -->
+    <!-- Subtle (secondary) button: #333 surface, faint white stroke, 4px corners. -->
     <Style x:Key="SubtleButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-        <Setter Property="Background" Value="#262626" />
+        <Setter Property="Background" Value="{StaticResource Subtle}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
+        <Setter Property="BorderBrush" Value="{StaticResource StrokeSubtle}" />
         <Setter Property="Height" Value="34" />
-        <Setter Property="Padding" Value="16,0,16,0" />
+        <Setter Property="Padding" Value="14,0,14,0" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bg" Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"
-                            Padding="{TemplateBinding Padding}">
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4"
+                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bg" Property="Background" Value="#303030" />
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource SubtleHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource SubtlePressed}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bg" Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Picky's icon-only toolbar button: 38×34, Unicode symbol glyph, tooltip carries the label. -->
+    <Style x:Key="ToolIconButton" TargetType="Button" BasedOn="{StaticResource SubtleButton}">
+        <Setter Property="FontFamily" Value="{StaticResource SymbolFont}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Width" Value="38" />
+        <Setter Property="Height" Value="34" />
+    </Style>
+
+    <!-- Borderless caption/window icon button (minimize, close), Picky/Study style. -->
+    <Style x:Key="IconButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="FontFamily" Value="{StaticResource SymbolFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="bd" CornerRadius="4" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource SubtleHover}" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource SubtlePressed}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Dark TextBox (accent hex input), Study style: accent border on focus. -->
+    <Style x:Key="DarkTextBox" TargetType="TextBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+        <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}" />
+        <Setter Property="Background" Value="{StaticResource Subtle}" />
+        <Setter Property="BorderBrush" Value="{StaticResource StrokeSubtle}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="bd" CornerRadius="4"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

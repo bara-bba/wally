@@ -4,44 +4,40 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Wally.App"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="wally" Height="640" Width="1000"
         MinHeight="480" MinWidth="760"
         Background="{StaticResource AppBackground}"
         FontFamily="{StaticResource AppFont}">
+    <shell:WindowChrome.WindowChrome>
+        <!-- Remove the OS titlebar entirely while keeping native resize,
+             Aero snap, and taskbar behaviour. The app header below is the
+             drag region; its buttons opt out via IsHitTestVisibleInChrome. -->
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <!-- Layout mirrors clony: a narrow icon-only rail (Settings pinned to the
+         bottom) and, beside it, an app header (logo tile, name, tagline,
+         centred page title, page actions, window buttons) over the page. -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="NavColumn" Width="60" />
+            <ColumnDefinition Width="61" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left navigation rail -->
-        <Border Grid.Column="0" Background="{StaticResource NavBackground}">
-            <DockPanel>
-                <!-- Hamburger toggle -->
-                <Button x:Name="NavToggle" DockPanel.Dock="Top"
-                        Width="40" Height="40" Margin="8,12,0,4"
-                        HorizontalAlignment="Left" Cursor="Hand"
-                        Click="NavToggle_Click"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="{StaticResource TextSecondary}">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="b" CornerRadius="6" Background="Transparent">
-                                <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                           FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{StaticResource CardHover}" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-
-                <!-- Nav items (Tag = Segoe Fluent glyph) -->
-                <StackPanel DockPanel.Dock="Top" Margin="0,8,0,0">
+        <!-- Left navigation rail: icons only. -->
+        <Border Grid.Column="0" Background="{StaticResource NavBackground}"
+                BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="0,64,0,12">
+                <RadioButton x:Name="NavSettings" DockPanel.Dock="Bottom"
+                             Style="{StaticResource NavButton}"
+                             Content="Settings" Tag="&#xE713;" ToolTip="Settings"
+                             Checked="NavSettings_Checked" GroupName="nav" />
+                <StackPanel DockPanel.Dock="Top">
                     <RadioButton x:Name="NavMonitors" Style="{StaticResource NavButton}"
                                  Content="Monitors" Tag="&#xE7F4;" IsChecked="True"
                                  ToolTip="Monitors"
@@ -50,27 +46,71 @@
                                  Content="Virtual desktops" Tag="&#xE7C4;"
                                  ToolTip="Virtual desktops"
                                  Checked="NavDesktops_Checked" GroupName="nav" />
-                    <RadioButton x:Name="NavSettings" Style="{StaticResource NavButton}"
-                                 Content="Settings" Tag="&#xE713;"
-                                 ToolTip="Settings"
-                                 Checked="NavSettings_Checked" GroupName="nav" />
                 </StackPanel>
-
-                <!-- Footer version (only when expanded) -->
-                <TextBlock DockPanel.Dock="Bottom" Text="v0.1.0 · Windows 11 24H2"
-                           Foreground="{StaticResource TextTertiary}" FontSize="11"
-                           Margin="18,0,0,16" VerticalAlignment="Bottom"
-                           Visibility="{Binding NavExpanded, RelativeSource={RelativeSource AncestorType=Window},
-                                        Converter={StaticResource BoolToVisibility}}" />
-                <Grid />
             </DockPanel>
         </Border>
 
-        <!-- Content host: a bounded (non-scrolling) area. Views that need to
-             scroll manage it internally; a scrolling host here would give the
-             Monitors view infinite height and break its star-row layout. -->
-        <Border Grid.Column="1" Padding="32,24,32,24">
-            <ContentControl x:Name="ContentHost" />
-        </Border>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="76" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- App header: the whole bar is the window drag region. -->
+            <Grid Grid.Row="0" Background="Transparent"
+                  MouseLeftButtonDown="CaptionStrip_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Brand: logo tile + name + tagline -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="20,0,16,0">
+                    <local:LogoMark Width="40" Height="40" VerticalAlignment="Center" />
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="wally" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}" />
+                        <TextBlock x:Name="TaglineText" FontSize="12"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Current page title, centred in the window -->
+                <TextBlock x:Name="PageTitleText" Grid.Column="1"
+                           FontSize="16" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextSecondary}"
+                           VerticalAlignment="Center" />
+
+                <!-- Page actions (e.g. refresh) + window buttons -->
+                <Grid Grid.Column="2" HorizontalAlignment="Right">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ContentControl x:Name="PageActionsHost" Grid.Column="0"
+                                    VerticalAlignment="Center" Margin="0,8,16,0"
+                                    shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                VerticalAlignment="Top" Margin="0,6,4,0"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <!-- Same IconButton style and Unicode glyphs as Picky / Study. -->
+                        <Button x:Name="MinimizeButton" Content="—" Style="{StaticResource IconButton}"
+                                Click="MinimizeButton_Click" ToolTip="Minimize" />
+                        <Button x:Name="MaximizeButton" Content="□" Style="{StaticResource IconButton}"
+                                Click="MaximizeButton_Click" ToolTip="Maximize" />
+                        <Button x:Name="CloseButton" Content="✕" Style="{StaticResource IconButton}"
+                                Click="CloseButton_Click" ToolTip="Close to tray" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <!-- Content host: bounded (non-scrolling); views scroll internally. -->
+            <Border Grid.Row="1" Padding="20,0,12,12">
+                <ContentControl x:Name="ContentHost" />
+            </Border>
+        </Grid>
     </Grid>
 </Window>
