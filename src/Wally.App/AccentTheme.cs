@@ -16,12 +16,13 @@ namespace Wally.App;
 /// </summary>
 internal static class AccentTheme
 {
-    /// <summary>Default accent — Windows blue, identical to Picky and Study.</summary>
-    public static readonly Color Default = Color.FromRgb(0x00, 0x78, 0xD4);
+    /// <summary>Default accent — mono white, matching wally's monochrome palette.</summary>
+    public static readonly Color Default = Color.FromRgb(0xFF, 0xFF, 0xFF);
 
     /// <summary>A small set of presets shown as one-click swatches in Settings.</summary>
     public static readonly (string Name, Color Color)[] Presets =
     {
+        ("Mono white (default)", Color.FromRgb(0xFF, 0xFF, 0xFF)),
         ("Windows blue (Picky / Study)", Color.FromRgb(0x00, 0x78, 0xD4)),
         ("wally blue", Color.FromRgb(0x2F, 0x6F, 0xED)),
         ("Teal", Color.FromRgb(0x12, 0xA3, 0x9A)),
@@ -29,7 +30,6 @@ internal static class AccentTheme
         ("Purple", Color.FromRgb(0x8B, 0x5C, 0xF6)),
         ("Magenta", Color.FromRgb(0xD1, 0x3A, 0x8E)),
         ("Orange", Color.FromRgb(0xE8, 0x6A, 0x17)),
-        ("Mono white", Color.FromRgb(0xFF, 0xFF, 0xFF)),
     };
 
     public static Color Current { get; private set; } = Default;

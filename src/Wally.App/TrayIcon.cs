@@ -71,10 +71,13 @@ public sealed class TrayIcon : IDisposable
             WinFormsApp.ToolTipIcon.None);
     }
 
-    private void ShowWindow()
+    internal void ShowWindow()
     {
         _window.Show();
-        _window.WindowState = WindowState.Normal;
+        if (_window.WindowState == WindowState.Minimized)
+        {
+            _window.WindowState = WindowState.Normal;
+        }
         _window.Activate();
     }
 

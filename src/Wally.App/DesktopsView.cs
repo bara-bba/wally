@@ -53,6 +53,7 @@ public sealed class DesktopsView : UserControl, IShellPage
     private StackPanel? _galleryPanel;
     private ScrollViewer? _galleryScroller;
     private TextBlock? _statusLabel;
+    private TextBlock? _toolbarStatus;
     private WallyConfig _config;
     private string _currentGuid = string.Empty;
     private string _selectedGuid = string.Empty;
@@ -98,16 +99,32 @@ public sealed class DesktopsView : UserControl, IShellPage
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // gallery (fills rest)
 
-        // Clony layout: title lives in the shell header; Refresh is published
-        // there via IShellPage.HeaderActions.
-        var refresh = new Button
-        {
-            Style = Res<Style>("ToolIconButton"),
-            ToolTip = "Refresh — re-scan virtual desktops and reload the gallery folder",
-            Content = GlyphIcon.Create("\u27F3"),
-        };
-        refresh.Click += (_, _) => RefreshDesktops();
-        HeaderActions = refresh;
+        // Study / Picky toolbar row (row 0). No Save on this page, so no accent
+        // primary button: just the icon tools and the folder status on the right.
+        _toolbarStatus = PageToolbar.Status();
+        var toolbar = PageToolbar.Compose(
+            new UIElement[]
+            {
+                PageToolbar.Tool(
+                    "\u27F3", // ⟳
+                    "Refresh — re-scan virtual desktops and reload the wallpaper folder",
+                    RefreshDesktops),
+                PageToolbar.Tool("\u270E", "Choose wallpaper folder…", PickFolder), // ✎
+                PageToolbar.Tool(
+                    "\u29C9", // ⧉
+                    "Open wallpaper folder in Explorer",
+                    () =>
+                    {
+                        if (!PageToolbar.OpenInExplorer(_config.GalleryFolder))
+                        {
+                            SetStatus("Choose a wallpaper folder first.");
+                        }
+                    }),
+            },
+            _toolbarStatus);
+        Grid.SetRow(toolbar, 0);
+        root.Children.Add(toolbar);
+        HeaderActions = null;
 
         // Desktop cards (horizontal strip).
         var listHost = new Border
@@ -633,10 +650,6 @@ public sealed class DesktopsView : UserControl, IShellPage
             Style = Res<Style>("CardLabel"),
             VerticalAlignment = VerticalAlignment.Center,
         });
-        var pick = new Button { Content = "Choose folder…", Style = Res<Style>("SubtleButton") };
-        pick.Click += (_, _) => PickFolder();
-        Grid.SetColumn(pick, 1);
-        headerRow.Children.Add(pick);
         Grid.SetRow(headerRow, 0);
         outer.Children.Add(headerRow);
 
@@ -686,6 +699,8 @@ public sealed class DesktopsView : UserControl, IShellPage
             _config = ConfigStore.Update(c => c with { GalleryFolder = folder });
         }
         catch { /* non-fatal */ }
+
+        UpdateToolbarStatus();
     }
 
     private void LoadGallery(string folder)
@@ -725,6 +740,20 @@ public sealed class DesktopsView : UserControl, IShellPage
                 FontSize = 12,
             });
         }
+
+        UpdateToolbarStatus();
+    }
+
+    /// <summary>Right-hand toolbar text: the wallpaper folder and its image count.</summary>
+    private void UpdateToolbarStatus()
+    {
+        if (_toolbarStatus is null)
+        {
+            return;
+        }
+
+        _toolbarStatus.Text = PageToolbar.GalleryStatus(_config.GalleryFolder, _gallery.Count);
+        _toolbarStatus.ToolTip = _config.GalleryFolder;
     }
 
     private Border BuildThumbnail(string path)

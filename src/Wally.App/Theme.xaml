@@ -9,7 +9,7 @@
     <Color x:Key="CardBackgroundColor">#2B2B2B</Color>
     <Color x:Key="CardHoverColor">#323232</Color>
     <Color x:Key="CardBorderColor">#383838</Color>
-    <Color x:Key="AccentColor">#0078D4</Color>
+    <Color x:Key="AccentColor">#FFFFFF</Color>
     <Color x:Key="AccentMutedColor">#333333</Color>
     <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
     <Color x:Key="TextSecondaryColor">#ADADAD</Color>
@@ -25,9 +25,9 @@
     <SolidColorBrush x:Key="AccentMuted" Color="{StaticResource AccentMutedColor}" />
     <!-- Accent-derived brushes, swapped live by AccentTheme.Apply. Seeded here
          so XAML that references them resolves before the first Apply call. -->
-    <SolidColorBrush x:Key="AccentHover" Color="#1683D8" />
-    <SolidColorBrush x:Key="AccentPressed" Color="#0067B8" />
-    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AccentHover" Color="#E6E6E6" />
+    <SolidColorBrush x:Key="AccentPressed" Color="#CCCCCC" />
+    <SolidColorBrush x:Key="OnAccent" Color="#1A1A1A" />
     <!-- Error / warning text, same as Study's Brush.Bad / Brush.Warn. -->
     <SolidColorBrush x:Key="Bad" Color="#FF6B6B" />
     <SolidColorBrush x:Key="Warn" Color="#FCE100" />

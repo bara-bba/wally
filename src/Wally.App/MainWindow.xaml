@@ -78,11 +78,8 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Current page title, centred in the window -->
-                <TextBlock x:Name="PageTitleText" Grid.Column="1"
-                           FontSize="16" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextSecondary}"
-                           VerticalAlignment="Center" />
+                <!-- No page title: like Study / Picky, the selected rail item names the page. -->
+                <TextBlock x:Name="PageTitleText" Grid.Column="1" Visibility="Collapsed" />
 
                 <!-- Page actions (e.g. refresh) + window buttons -->
                 <Grid Grid.Column="2" HorizontalAlignment="Right">
@@ -108,7 +105,7 @@
             </Grid>
 
             <!-- Content host: bounded (non-scrolling); views scroll internally. -->
-            <Border Grid.Row="1" Padding="20,0,12,12">
+            <Border Grid.Row="1" Padding="20,8,12,12">
                 <ContentControl x:Name="ContentHost" />
             </Border>
         </Grid>

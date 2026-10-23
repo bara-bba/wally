@@ -13,6 +13,7 @@ namespace Wally.App;
 public partial class App : Application
 {
     private TrayIcon? _tray;
+    private SingleInstance? _instance;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -20,6 +21,15 @@ public partial class App : Application
 
         // Do not quit when the last window hides; the tray owns the lifetime.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        // Only one wally may run. A second launch brings the running window
+        // forward and exits before creating a backend, watcher or tray icon.
+        _instance = SingleInstance.TryAcquire();
+        if (_instance is null)
+        {
+            Shutdown();
+            return;
+        }
 
         // Apply the saved accent colour before the first window paints, so the
         // UI starts in the user's chosen colour rather than flashing the default.
@@ -66,11 +76,15 @@ public partial class App : Application
         var window = new MainWindow(backend, backendError, e.Args.Contains("--simulate"), vds);
         _tray = new TrayIcon(window);
         window.Show();
+
+        var tray = _tray;
+        _instance.ListenForShowRequests(() => Dispatcher.BeginInvoke(tray.ShowWindow));
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _tray?.Dispose();
+        _instance?.Dispose();
         base.OnExit(e);
     }
 }

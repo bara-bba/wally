@@ -60,6 +60,7 @@ public sealed class MonitorsView : UserControl, IShellPage
     private StackPanel? _barButtons;
     private TextBlock? _statusLabel;
     private ScrollViewer? _galleryScroller;
+    private TextBlock? _toolbarStatus;
     private WallyConfig _config;
     private MonitorSetup? _currentSetup;
 
@@ -197,26 +198,39 @@ public sealed class MonitorsView : UserControl, IShellPage
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });  // splitter
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1.4, GridUnitType.Star), MinHeight = 150 }); // gallery (resizable, larger)
 
-        // Clony layout: the page title lives in the shell header, so the page
-        // has no title block. Its Save setup + Refresh buttons are published to
-        // the shell header via IShellPage.HeaderActions.
-        var headerActions = new StackPanel { Orientation = Orientation.Horizontal };
-
-        var saveSetup = IconButton(
-            "\U0001F5AB", // 🖫 save (floppy), Segoe UI Symbol
-            "Save setup — remember the current wallpaper on each display for this exact set of monitors. "
-                + "When this set is detected again, wally re-applies it automatically.");
-        saveSetup.Margin = new Thickness(0, 0, 8, 0);
-        saveSetup.Click += (_, _) => SaveCurrentSetup();
-        headerActions.Children.Add(saveSetup);
-
-        var refresh = IconButton(
-            "\u27F3", // ⟳ refresh — same glyph as Picky's gallery toolbar
-            "Refresh — re-read connected displays and reload the gallery folder "
-                + "(use after plugging in a monitor or adding images to the folder).");
-        refresh.Click += (_, _) => RefreshAll();
-        headerActions.Children.Add(refresh);
-        HeaderActions = headerActions;
+        // Study / Picky toolbar row (row 0): accent primary action, a divider,
+        // then 38×34 icon buttons, with grey status text on the right.
+        _toolbarStatus = PageToolbar.Status();
+        var toolbar = PageToolbar.Compose(
+            new UIElement[]
+            {
+                PageToolbar.Primary(
+                    "\U0001F5AB", // 🖫 floppy
+                    "Save setup",
+                    "Remember the current wallpaper on each display for this exact set of monitors. "
+                        + "When this set is detected again, wally re-applies it automatically.",
+                    SaveCurrentSetup),
+                PageToolbar.Divider(),
+                PageToolbar.Tool(
+                    "\u27F3", // ⟳
+                    "Refresh — re-detect displays and reload the wallpaper folder",
+                    RefreshAll),
+                PageToolbar.Tool("\u270E", "Choose wallpaper folder…", PickFolder), // ✎
+                PageToolbar.Tool(
+                    "\u29C9", // ⧉
+                    "Open wallpaper folder in Explorer",
+                    () =>
+                    {
+                        if (!PageToolbar.OpenInExplorer(_config.GalleryFolder))
+                        {
+                            SetStatusError("Choose a wallpaper folder first.");
+                        }
+                    }),
+            },
+            _toolbarStatus);
+        Grid.SetRow(toolbar, 0);
+        root.Children.Add(toolbar);
+        HeaderActions = null;
 
         // Layout + per-monitor controls share row 1: canvas fills, controls dock bottom.
         var layoutHost = new Border
@@ -284,6 +298,7 @@ public sealed class MonitorsView : UserControl, IShellPage
         }
 
         BuildMonitorSlots();
+        UpdateToolbarStatus();
     }
 
     // --- Monitor layout ----------------------------------------------------
@@ -368,6 +383,7 @@ public sealed class MonitorsView : UserControl, IShellPage
         }
 
         BuildBottomBar();
+        UpdateToolbarStatus();
 
         // If this exact set of monitors has a saved configuration, load it into
         // the previews so the UI reflects what will be applied.
@@ -394,6 +410,8 @@ public sealed class MonitorsView : UserControl, IShellPage
         {
             LoadGallery(_config.GalleryFolder);
         }
+
+        UpdateToolbarStatus();
     }
 
     /// <summary>
@@ -1334,10 +1352,6 @@ public sealed class MonitorsView : UserControl, IShellPage
         };
         Grid.SetColumn(galleryTitle, 0);
         headerRow.Children.Add(galleryTitle);
-        var pick = new Button { Content = "Choose folder…", Style = Res<Style>("SubtleButton") };
-        pick.Click += (_, _) => PickFolder();
-        Grid.SetColumn(pick, 1);
-        headerRow.Children.Add(pick);
         Grid.SetRow(headerRow, 0);
         outer.Children.Add(headerRow);
 
@@ -1401,6 +1415,8 @@ public sealed class MonitorsView : UserControl, IShellPage
         {
             // Non-fatal: the gallery still works this session.
         }
+
+        UpdateToolbarStatus();
     }
 
     private void LoadGallery(string folder)
@@ -1440,6 +1456,22 @@ public sealed class MonitorsView : UserControl, IShellPage
                 FontSize = 12,
             });
         }
+
+        UpdateToolbarStatus();
+    }
+
+    /// <summary>Right-hand toolbar text: display count, then folder path and image count.</summary>
+    private void UpdateToolbarStatus()
+    {
+        if (_toolbarStatus is null)
+        {
+            return;
+        }
+
+        var displays = $"{_slots.Count} display{(_slots.Count == 1 ? "" : "s")}";
+        var gallery = PageToolbar.GalleryStatus(_config.GalleryFolder, _gallery.Count);
+        _toolbarStatus.Text = $"{displays}  ·  {gallery}";
+        _toolbarStatus.ToolTip = _config.GalleryFolder;
     }
 
     private Border BuildThumbnail(string path)

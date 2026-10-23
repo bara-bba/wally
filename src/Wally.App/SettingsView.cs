@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Wally.Core;
@@ -115,7 +115,7 @@ public sealed class SettingsView : UserControl, IShellPage
             Style = Res<Style>("DarkTextBox"),
             FontFamily = new FontFamily("Cascadia Mono, Consolas"),
             VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = "Enter a colour as #RRGGBB, e.g. #2F6FED",
+            ToolTip = "Enter a colour as #RRGGBB, e.g. #0078D4",
         };
         _hexBox.TextChanged += (_, _) => OnHexChanged();
         hexRow.Children.Add(_hexBox);
@@ -166,7 +166,7 @@ public sealed class SettingsView : UserControl, IShellPage
             BorderThickness = new Thickness(2),
             Margin = new Thickness(0, 0, 8, 8),
             Cursor = Cursors.Hand,
-            ToolTip = $"{name} · {AccentTheme.ToHex(color)}",
+            ToolTip = $"{name} � {AccentTheme.ToHex(color)}",
         };
         chip.MouseLeftButtonUp += (_, _) => ApplyColor(color);
         _presetChips.Add(chip);
@@ -187,7 +187,7 @@ public sealed class SettingsView : UserControl, IShellPage
         }
         else
         {
-            SetStatus("Enter a colour as #RRGGBB, e.g. #2F6FED.", error: true);
+            SetStatus("Enter a colour as #RRGGBB, e.g. #0078D4.", error: true);
         }
     }
 
@@ -195,7 +195,7 @@ public sealed class SettingsView : UserControl, IShellPage
     {
         if (!AccentTheme.TryParse(_hexBox!.Text, out var c))
         {
-            SetStatus("Enter a colour as #RRGGBB, e.g. #2F6FED.", error: true);
+            SetStatus("Enter a colour as #RRGGBB, e.g. #0078D4.", error: true);
             return;
         }
 
